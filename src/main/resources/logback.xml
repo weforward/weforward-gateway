@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+	<!-- For assistance related to logback-translator or configuration  -->
+	<!-- files in general, please contact the logback user mailing list -->
+	<!-- at http://www.qos.ch/mailman/listinfo/logback-user             -->
+	<!--                                                                -->
+	<!-- For professional support please see                            -->
+	<!--    http://www.qos.ch/shop/products/professionalSupport         -->
+	<!--                                                                -->
+<configuration>
+	<appender name="file"
+		class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+			<FileNamePattern>${logs.path}/%d{yyyyMMdd}.log</FileNamePattern>
+			<MaxHistory>30</MaxHistory>
+		</rollingPolicy>
+		<encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+			<pattern>%d{yyyyMMdd HH:mm:ss.SSS}[%thread]%-5level %logger{50} %msg%n
+			</pattern>
+		</encoder>
+	</appender>
+	
+	<appender name="remote" class="cn.weforward.common.log.DelayRemoteAppender">
+		<url>${rlog.url}</url>
+		<projectName>gateway</projectName>
+		<serverid>${gateway.id}</serverid>
+		<layout class="ch.qos.logback.classic.PatternLayout">
+			<pattern>%d{HH:mm:ss.SSS}[%thread]%-5level %logger{50} %msg%n
+			</pattern>
+		</layout>
+	</appender>
+	
+	<logger name="com.ourlinc.aio.netty" level="TRACE" />
+	<!-- logger name="cn.weforward.gateway.ingress.HttpTunnel" level="TRACE" / -->
+	<!-- logger name="cn.weforward.gateway.core.ServiceEndpoint" level="TRACE" / -->
+	<logger name="cn.weforward.gateway.core.GatewayExt" level="TRACE" />
+	<logger name="cn.weforward.gateway.distribute.DistributeManageImpl" level="TRACE" />
+	<!-- logger name="cn.weforward.protocol.aio.netty.ByteBufInput" level="TRACE" / -->
+	<logger name="cn.weforward.gateway.ops" level="TRACE" />
+	
+	<root level="INFO">
+		<appender-ref ref="file" />
+		<appender-ref ref="remote" />
+	</root>
+</configuration>

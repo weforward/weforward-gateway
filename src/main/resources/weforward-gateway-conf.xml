@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!-- 浩宁云主配置文件 -->
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context" xmlns:p="http://www.springframework.org/schema/p"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans
+  http://www.springframework.org/schema/beans/spring-beans-2.5.xsd
+  http://www.springframework.org/schema/context
+  http://www.springframework.org/schema/context/spring-context-2.5.xsd
+	http://www.springframework.org/schema/tx
+	http://www.springframework.org/schema/tx/spring-tx-2.5.xsd
+	http://www.springframework.org/schema/aop
+	http://www.springframework.org/schema/aop/spring-aop-2.5.xsd">
+
+	<bean id="propertyConfigurer" class="cn.weforward.gateway.start.MyPropertyPlaceholderConfigurer">
+		<property name="locations">
+			<list>
+				<value>file:${user.dir}/conf/gateway.properties</value>
+			</list>
+		</property>
+	</bean>
+
+	<!-- 通用后台任务执行器 -->
+	<bean id="backgroundExecutor" class="cn.weforward.common.util.BackgroundExecutor">
+		<constructor-arg index="0" value="20" />
+		<constructor-arg index="1" value="bg" />
+	</bean>
+
+	<!-- 访问许可管理 -->
+	<bean id="accessManage" name="accessLoader" class="cn.weforward.gateway.ops.access.AccessManageImpl">
+		<property name="pluginContainer" ref="pluginContainer" />
+	</bean>
+
+	<!-- 服务凭证提供者 -->
+	<bean id="systemAccessProvider" class="cn.weforward.gateway.ops.access.system.ServiceAccessProvider">
+		<constructor-arg index="0" value="${gateway.id}" />
+		<property name="accessManage" ref="accessManage" />
+		<property name="pluginContainer" ref="pluginContainer" />
+	</bean>
+
+	<!-- 网关凭证提供者 -->
+	<bean id="gatewayAccessProvider" class="cn.weforward.gateway.ops.access.system.GatewayAccessProvider">
+		<property name="accessManage" ref="accessManage" />
+		<property name="internalAccessSecret" value="${internalAccess.secret}" />
+	</bean>
+
+	<!-- 微服务权限管理 -->
+	<bean id="rightManage" class="cn.weforward.gateway.ops.right.RightManageImpl">
+		<property name="accessLoader" ref="accessLoader" />
+		<property name="pluginContainer" ref="pluginContainer" />
+	</bean>
+
+	<!-- 微服务流量管理 -->
+	<bean id="trafficManage" class="cn.weforward.gateway.ops.traffic.TrafficManageImpl">
+		<property name="pluginContainer" ref="pluginContainer" />
+	</bean>
+
+	<!-- 数据制作器 -->
+	<bean id="producer" class="cn.weforward.protocol.support.SimpleProducer">
+		<constructor-arg index="0" ref="accessManage" />
+	</bean>
+
+	<!-- 微服务集合 -->
+	<bean id="gateway" class="cn.weforward.gateway.core.GatewayImpl">
+		<property name="accessManage" ref="accessManage" />
+		<property name="rightManage" ref="rightManage" />
+		<property name="trafficManage" ref="trafficManage" />
+		<property name="backgroundExecutor" ref="backgroundExecutor" />
+		<property name="producer" ref="producer" />
+		<property name="rpcExecutor" ref="rpcExecutor" />
+		<property name="pluginContainer" ref="pluginContainer" />
+		<property name="serviceTracer" ref="serviceTracer" />
+		<property name="meterRegistry" ref="meterRegistry" />
+	</bean>
+
+	<!-- 分布管理 -->
+	<bean id="distributeManage" name="gatewayNodes" class="cn.weforward.gateway.distribute.DistributeManageImpl">
+		<constructor-arg index="0" value="${gateway.id}" />
+		<constructor-arg index="1" value="${gateway.host}" />
+		<constructor-arg index="2" value="${gateway.port}" />
+		<property name="gateway" ref="gateway" />
+		<property name="accessManage" ref="accessManage" />
+		<property name="brothers" value="${gateway.brothers}" />
+		<property name="interval" value="10" />
+		<property name="pluginContainer" ref="pluginContainer" />
+	</bean>
+
+	<!-- 网关api集 -->
+	<bean id="gatewayApis" class="cn.weforward.gateway.api.GatewayApis">
+		<property name="accessManage" ref="accessManage" />
+		<property name="rightManage" ref="rightManage" />
+		<property name="trafficManage" ref="trafficManage" />
+		<property name="gateway" ref="gateway" />
+		<property name="distributeManage" ref="distributeManage" />
+	</bean>
+
+	<!-- 插件管理 -->
+	<bean id="pluginManage" name="pluginContainer" class="cn.weforward.gateway.plugin.PluginManage">
+		<property name="accessLoader" ref="accessLoader" />
+		<property name="gatewayNodes" ref="gatewayNodes" />
+		<property name="gateway" ref="gateway" />
+		<property name="pluginNames"
+			value="cn.weforward.gateway.plugin.mongodb.DataFactory;cn.weforward.gateway.plugin.alarm.Alarmers;cn.weforward.gateway.plugin.access.UserAccessProvider" />
+	</bean>
+
+	<!-- 监控注册表 -->
+	<bean id="meterRegistry" class="cn.weforward.metrics.RemoteMeterRegistry">
+		<constructor-arg index="0" value="${metrics.meterUrl}" />
+	</bean>
+
+	<!-- 微服务调用追踪器 -->
+	<bean id="serviceTracer" class="cn.weforward.gateway.ops.trace.MetricsServiceTracer">
+		<constructor-arg index="0" value="${gateway.id}" />
+		<property name="meterRegistry" ref="meterRegistry" />
+	</bean>
+
+	<!-- 网关指标收集器 -->
+	<bean id="metricsCollecter" class="cn.weforward.gateway.core.MetricsCollecter">
+		<constructor-arg index="0" value="${gateway.id}" />
+		<constructor-arg index="1" ref="meterRegistry" />
+		<property name="interval" value="30" />
+	</bean>
+</beans>
