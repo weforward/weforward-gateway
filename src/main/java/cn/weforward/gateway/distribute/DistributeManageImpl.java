@@ -221,7 +221,7 @@ public class DistributeManageImpl
 		int i = 0;
 		for (; i < nodes.size(); i++) {
 			GatewayNode node = nodes.get(i);
-			if (m_SelfNode.id.equals(node.getId())) {
+			if (m_SelfNode.isSame(node)) {
 				continue;
 			}
 			NodeAgent agent = brothers.get(node.getId());
@@ -245,7 +245,7 @@ public class DistributeManageImpl
 			Map<String, NodeAgent> copy = new HashMap<>(brothers);
 			for (; i < nodes.size(); i++) {
 				GatewayNode node = nodes.get(i);
-				if (m_SelfNode.id.equals(node.getId())) {
+				if (m_SelfNode.isSame(node)) {
 					continue;
 				}
 				NodeAgent exist = brothers.get(node.getId());
@@ -375,7 +375,7 @@ public class DistributeManageImpl
 			}
 			String method = "get_services";
 			PageDataMapper pageDataMapper = new PageDataMapper(ServiceExt.class, ServiceExtMapper.INSTANCE);
-			RemoteResultPage<ServiceExt> rp = new RemoteResultPage<>(pageDataMapper, 1, 1000, invoker, method);
+			RemoteResultPage<ServiceExt> rp = new RemoteResultPage<>(pageDataMapper, invoker, method);
 			return rp;
 		}
 
@@ -455,6 +455,12 @@ public class DistributeManageImpl
 			return true;
 		}
 
+		boolean isSame(GatewayNode other) {
+			if(getId().equals(other.getId())) {
+				return true;
+			}
+			return getHostName().equals(other.getHostName()) && (getPort() == other.getPort());
+		}
 	}
 
 	synchronized void startTask() {

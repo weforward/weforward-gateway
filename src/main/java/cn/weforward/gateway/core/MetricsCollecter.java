@@ -42,7 +42,7 @@ public class MetricsCollecter {
 	// 刷新间隔，单位：秒
 	int m_RefreshInterval;
 
-	volatile int m_LastRefresh;
+	volatile long m_LastRefresh;
 
 	static class RpcCounter {
 		volatile int m_RpcCount;
@@ -144,8 +144,8 @@ public class MetricsCollecter {
 	}
 
 	private synchronized void refresh() {
-		int t = _Tick.getTicker() / m_RefreshInterval;
-		if (t != m_LastRefresh) {
+		long t = _Tick.getTickerLong();
+		if (Math.abs(t - m_LastRefresh) > m_RefreshInterval) {
 			VmStat.refresh();
 			m_RpcCounter.refresh();
 			m_LastRefresh = t;

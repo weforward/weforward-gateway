@@ -57,7 +57,9 @@ public class TrafficManageImpl
 				}
 				TrafficTableVo vo = factory.get(key);
 				if (null == vo) {
-					_Logger.warn("找不到：" + key);
+					if (_Logger.isTraceEnabled()) {
+						_Logger.trace("找不到：" + key);
+					}
 					return null;
 				}
 				return new TrafficTable(TrafficManageImpl.this, factory, vo);

@@ -45,6 +45,7 @@ import cn.weforward.gateway.ops.right.RightManage;
 import cn.weforward.gateway.ops.trace.ServiceTracer;
 import cn.weforward.gateway.ops.traffic.TrafficListener;
 import cn.weforward.gateway.ops.traffic.TrafficManage;
+import cn.weforward.gateway.util.ServiceNameMatcher;
 import cn.weforward.metrics.WeforwadMetrics;
 import cn.weforward.protocol.Service;
 import cn.weforward.protocol.aio.netty.NettyHttpClientFactory;
@@ -130,7 +131,7 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 				}
 			};
 		}.start();
-		
+
 		GcCleaner.register(this);
 	}
 
@@ -381,6 +382,10 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 		ServiceEndpointBalance balance = m_ServiceBalances.get(service.getName());
 		if (null != balance) {
 			balance.remove(service);
+			if(0 == balance.getEndpointCount()) {
+				// 与注册并发时，可能抢先移除，重新注册一遍就行，不做同步
+				m_ServiceBalances.remove(service.getName());
+			}
 		}
 	}
 
@@ -414,19 +419,33 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 
 	@Override
 	public ResultPage<String> listServiceName(String keyword) {
-		Set<String> keys = m_ServiceBalances.keySet();
-		if (keys.isEmpty()) {
+		if (m_ServiceBalances.isEmpty()) {
 			return ResultPageHelper.empty();
 		}
-		List<String> list = new ArrayList<>();
-		for (String k : keys) {
-			if (!StringUtil.isEmpty(keyword) && !k.contains(keyword)) {
-				continue;
+		List<String> result;
+		if (StringUtil.isEmpty(keyword)) {
+			result = new ArrayList<>(m_ServiceBalances.keySet());
+		} else if (!ServiceNameMatcher.hasWildcard(keyword)) {
+			if (m_ServiceBalances.containsKey(keyword)) {
+				result = Collections.singletonList(keyword);
+			} else {
+				result = Collections.emptyList();
 			}
-			list.add(k);
+		} else {
+			Set<String> names = m_ServiceBalances.keySet();
+			ServiceNameMatcher matcher = ServiceNameMatcher.getInstance(keyword);
+			result = new ArrayList<>();
+			for (String n : names) {
+				if (!matcher.match(n)) {
+					continue;
+				}
+				result.add(n);
+			}
 		}
-		Collections.sort(list);
-		return ResultPageHelper.toResultPage(list);
+		if (result.size() > 1) {
+			Collections.sort(result);
+		}
+		return ResultPageHelper.toResultPage(result);
 	}
 
 	@Override

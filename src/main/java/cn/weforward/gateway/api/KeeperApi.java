@@ -204,6 +204,14 @@ class KeeperApi extends AbstractGatewayApi {
 		@Override
 		PageData execute(Header reqHeader, FriendlyObject params) throws ApiException {
 			String keyword = params.getString("keyword");
+			if (!StringUtil.isEmpty(keyword)) {
+				if ('*' != keyword.charAt(0)) {
+					keyword = '*' + keyword;
+				}
+				if ('*' != keyword.charAt(keyword.length() - 1)) {
+					keyword = keyword + '*';
+				}
+			}
 			int page = params.getInt("page", 1);
 			int pageSize = params.getInt("page_size", 50);
 			ResultPage<String> names = m_Gateway.listServiceName(keyword);

@@ -68,6 +68,8 @@ public interface Gateway {
 	/**
 	 * 列举微服务名称
 	 * 
+	 * @param keyword
+	 *            名称关键字，支持通配符'*'，如：*_order,*.pay,us*er
 	 * @return
 	 */
 	ResultPage<String> listServiceName(String keyword);

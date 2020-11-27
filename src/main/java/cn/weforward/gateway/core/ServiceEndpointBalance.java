@@ -90,6 +90,10 @@ public class ServiceEndpointBalance {
 		}
 		m_Endpoints = elements;
 	}
+	
+	public int getEndpointCount() {
+		return null == m_Endpoints ? 0 : m_Endpoints.length;
+	}
 
 	public synchronized void put(ServiceInstance service) {
 		if (null == m_Endpoints) {

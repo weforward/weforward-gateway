@@ -10,6 +10,7 @@
  */
 package cn.weforward.gateway.api;
 
+import cn.weforward.common.ResultPage;
 import cn.weforward.common.util.ListUtil;
 import cn.weforward.common.util.StringUtil;
 import cn.weforward.gateway.Configure;
@@ -19,6 +20,8 @@ import cn.weforward.protocol.ServiceName;
 import cn.weforward.protocol.gateway.vo.ServiceVo;
 import cn.weforward.protocol.support.BeanObjectMapper;
 import cn.weforward.protocol.support.CommonServiceCodes;
+import cn.weforward.protocol.support.PageData;
+import cn.weforward.protocol.support.PageDataMapper;
 import cn.weforward.protocol.support.SimpleObjectMapperSet;
 import cn.weforward.protocol.support.SpecificationChecker;
 import cn.weforward.protocol.support.datatype.FriendlyObject;
@@ -39,10 +42,13 @@ class ServiceRegisterApi extends AbstractGatewayApi {
 
 		SimpleObjectMapperSet mappers = new SimpleObjectMapperSet();
 		mappers.register(BeanObjectMapper.getInstance(ServiceVo.class));
+		PageDataMapper pageDataMapper = new PageDataMapper(mappers);
+		mappers.register(pageDataMapper);
 		m_Mappers = mappers;
 
 		register(register);
 		register(unregister);
+		register(listServiceName);
 	}
 
 	@Override
@@ -84,6 +90,22 @@ class ServiceRegisterApi extends AbstractGatewayApi {
 			}
 			m_Gateway.unregisterService(reqHeader.getAccessId(), info);
 			return null;
+		}
+	};
+	
+	private ApiMethod listServiceName = new ApiMethod("list_service_name", true) {
+
+		@Override
+		PageData execute(Header reqHeader, FriendlyObject params) throws ApiException {
+			String keyword = params.getString("keyword");
+			int page = params.getInt("page", 1);
+			int pageSize = params.getInt("page_size", 50);
+			ResultPage<String> names = m_Gateway.listServiceName(keyword);
+			if (names.getCount() > 0) {
+				names.setPageSize(pageSize);
+				names.gotoPage(page);
+			}
+			return new PageData(names);
 		}
 	};
 
