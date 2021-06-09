@@ -54,6 +54,11 @@
 		<property name="pluginContainer" ref="pluginContainer" />
 	</bean>
 
+	<!-- ACL管理 -->
+	<bean id="aclManage" class="cn.weforward.gateway.ops.acl.AclManageImpl">
+		<property name="pluginContainer" ref="pluginContainer" />
+	</bean>
+
 	<!-- 数据制作器 -->
 	<bean id="producer" class="cn.weforward.protocol.support.SimpleProducer">
 		<constructor-arg index="0" ref="accessManage" />
@@ -61,15 +66,17 @@
 
 	<!-- 微服务集合 -->
 	<bean id="gateway" class="cn.weforward.gateway.core.GatewayImpl">
+		<constructor-arg index="0" value="${gateway.id}" />
+		<constructor-arg index="1" ref="meterRegistry" />
 		<property name="accessManage" ref="accessManage" />
 		<property name="rightManage" ref="rightManage" />
 		<property name="trafficManage" ref="trafficManage" />
+		<property name="aclManage" ref="aclManage" />
 		<property name="backgroundExecutor" ref="backgroundExecutor" />
 		<property name="producer" ref="producer" />
-		<property name="rpcExecutor" ref="rpcExecutor" />
+		<property name="rpcExecutor" ref="${rpcExecutor:rpcPoolExecutor}" />
 		<property name="pluginContainer" ref="pluginContainer" />
 		<property name="serviceTracer" ref="serviceTracer" />
-		<property name="meterRegistry" ref="meterRegistry" />
 	</bean>
 
 	<!-- 分布管理 -->
@@ -79,8 +86,20 @@
 		<constructor-arg index="2" value="${gateway.port}" />
 		<property name="gateway" ref="gateway" />
 		<property name="accessManage" ref="accessManage" />
-		<property name="brothers" value="${gateway.brothers}" />
+		<property name="brothers" value="${gateway.brothers:}" />
 		<property name="interval" value="10" />
+		<property name="pluginContainer" ref="pluginContainer" />
+	</bean>
+	
+	<!-- 网格管理 -->
+	<bean id="meshManage" class="cn.weforward.gateway.mesh.MeshManageImpl">
+		<constructor-arg index="0" value="${mesh.id:}" />
+		<constructor-arg index="1" value="${mesh.urls:}" />
+		<constructor-arg index="2" value="${mesh.isMaster:false}" />
+		<property name="gateway" ref="gateway" />
+		<property name="accessManage" ref="accessManage" />
+		<property name="brothers" value="${mesh.brothers:}" />
+		<property name="interval" value="${mesh.interval:0}" />
 		<property name="pluginContainer" ref="pluginContainer" />
 	</bean>
 
@@ -91,6 +110,7 @@
 		<property name="trafficManage" ref="trafficManage" />
 		<property name="gateway" ref="gateway" />
 		<property name="distributeManage" ref="distributeManage" />
+		<property name="meshManage" ref="meshManage" />
 	</bean>
 
 	<!-- 插件管理 -->
@@ -104,13 +124,7 @@
 
 	<!-- 监控注册表 -->
 	<bean id="meterRegistry" class="cn.weforward.metrics.RemoteMeterRegistry">
-		<constructor-arg index="0" value="${metrics.meterUrl}" />
-	</bean>
-
-	<!-- 微服务调用追踪器 -->
-	<bean id="serviceTracer" class="cn.weforward.gateway.ops.trace.MetricsServiceTracer">
-		<constructor-arg index="0" value="${gateway.id}" />
-		<property name="meterRegistry" ref="meterRegistry" />
+		<constructor-arg index="0" value="${metrics.meterUrl:}" />
 	</bean>
 
 	<!-- 网关指标收集器 -->
@@ -118,5 +132,16 @@
 		<constructor-arg index="0" value="${gateway.id}" />
 		<constructor-arg index="1" ref="meterRegistry" />
 		<property name="interval" value="30" />
+	</bean>
+	
+	<!-- 追踪登记 -->
+	<bean id="traceRegistry" class="cn.weforward.trace.RemoteTraceRegistry">
+		<constructor-arg index="0" value="${metrics.traceUrl:}" />
+	</bean>
+
+	<!-- 微服务调用追踪器 -->
+	<bean id="serviceTracer" class="cn.weforward.gateway.ops.trace.MetricsServiceTracer">
+		<constructor-arg index="0" value="${gateway.id}" />
+		<property name="traceRegistry" ref="traceRegistry" />
 	</bean>
 </beans>

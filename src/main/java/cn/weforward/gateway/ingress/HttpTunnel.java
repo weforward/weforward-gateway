@@ -53,6 +53,7 @@ import cn.weforward.protocol.aio.http.HttpHeaderOutput;
 import cn.weforward.protocol.aio.http.HttpHeaders;
 import cn.weforward.protocol.auth.AuthExceptionWrap;
 import cn.weforward.protocol.auth.AutherOutputStream;
+import cn.weforward.protocol.exception.AuthException;
 import cn.weforward.protocol.exception.InvokeDeniedException;
 import cn.weforward.protocol.exception.WeforwardException;
 
@@ -466,7 +467,7 @@ public class HttpTunnel implements Tunnel, HeaderOutput, ServerHandler, Runnable
 		// m_Context.close(); 不用关
 	}
 
-	void parseHeader() {
+	protected void parseHeader() {
 		synchronized (this) {
 			if (m_Schedule >= SCHEDULE_BEGIN) {
 				return;
@@ -826,6 +827,11 @@ public class HttpTunnel implements Tunnel, HeaderOutput, ServerHandler, Runnable
 			// 对接微服务端
 			m_Supporter.getGateway().joint(HttpTunnel.this);
 		} catch (Throwable e) {
+			if (_Logger.isDebugEnabled() && e instanceof AuthException) {
+				_Logger.debug("request header, s:" + m_Header.getService() + ",acc:" + m_Header.getAccessId() + ",n:"
+						+ m_Header.getNoise() + ",tag:" + m_Header.getTag() + ",ch:" + m_Header.getChannel() + ",cs:"
+						+ m_Header.getContentSign() + ",sign:" + m_Header.getSign());
+			}
 			responseError(e);
 			return;
 		}

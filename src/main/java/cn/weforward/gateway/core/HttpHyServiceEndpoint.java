@@ -29,7 +29,7 @@ import cn.weforward.protocol.ops.traffic.TrafficTableItem;
  */
 public class HttpHyServiceEndpoint extends HttpServiceEndpoint {
 
-	public HttpHyServiceEndpoint(ServiceEndpointBalance group, ServiceInstance service, TrafficTableItem rule) {
+	public HttpHyServiceEndpoint(ServiceInstanceBalance group, ServiceInstance service, TrafficTableItem rule) {
 		super(group, service, rule);
 	}
 

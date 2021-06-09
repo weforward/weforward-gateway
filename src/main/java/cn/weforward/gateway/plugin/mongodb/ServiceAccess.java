@@ -23,7 +23,7 @@ import cn.weforward.gateway.plugin.mongodb.di.ServiceAccessDi;
  * @author zhangpengji
  *
  */
-public class ServiceAccess extends AbstractPersistent<ServiceAccessDi> {// implements Reloadable<ServiceAccess>
+public class ServiceAccess extends AbstractPersistent<ServiceAccessDi> implements VoPersistent<ServiceAccessVo> {
 
 	@Resource
 	ServiceAccessVo m_Vo;
@@ -39,12 +39,14 @@ public class ServiceAccess extends AbstractPersistent<ServiceAccessDi> {// imple
 		markPersistenceUpdate();
 	}
 
-	void updateVo(ServiceAccessVo vo) {
+	@Override
+	public void updateVo(ServiceAccessVo vo) {
 		m_Vo = vo;
 		markPersistenceUpdate();
 	}
 
-	ServiceAccessVo getVo() {
+	@Override
+	public ServiceAccessVo getVo() {
 		return m_Vo;
 	}
 
@@ -61,12 +63,13 @@ public class ServiceAccess extends AbstractPersistent<ServiceAccessDi> {// imple
 	// return true;
 	// }
 
-	boolean reload(ServiceAccess other) {
+	@Override
+	public boolean reload(VoPersistent<ServiceAccessVo> other) {
 		if (null == other) {
 			return false;
 		}
 		synchronized (this) {
-			m_Vo = other.m_Vo;
+			m_Vo = ((ServiceAccess) other).m_Vo;
 		}
 		return true;
 	}

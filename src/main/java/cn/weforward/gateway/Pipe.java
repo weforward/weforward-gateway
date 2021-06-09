@@ -24,6 +24,8 @@ import cn.weforward.protocol.Service;
  *
  */
 public interface Pipe {
+	
+	Header getHeader();
 
 	/** @see Header#getTag() */
 	String getTag();

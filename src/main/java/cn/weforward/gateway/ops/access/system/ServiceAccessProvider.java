@@ -48,9 +48,11 @@ import cn.weforward.protocol.ops.AccessExt;
  * @author zhangpengji
  *
  */
-public class ServiceAccessProvider implements AccessProvider, PluginListener, ServiceAccessVoFactory.ReloadListener,
-		MasterKeyVoFactory.ReloadListener, GcCleanable {
+public class ServiceAccessProvider implements AccessProvider, PluginListener, GcCleanable {
 	static final Logger _Logger = LoggerFactory.getLogger(ServiceAccessProvider.class);
+
+	static final String KIND = Access.KIND_SERVICE;
+	static final String KIND_PREFIX = KIND + Access.SPEARATOR;
 
 	LruCache<String, ServiceAccess> m_SystemAccessCache;
 	LruCache.Loader<String, ServiceAccess> m_SystemAccessLoader;
@@ -60,7 +62,7 @@ public class ServiceAccessProvider implements AccessProvider, PluginListener, Se
 
 	ServiceAccessVoFactory m_AccessVoFactory;
 	MasterKeyVoFactory m_MasterKeyVoFactory;
-
+	
 	public ServiceAccessProvider(String gatewayId) {
 		m_SystemAccessCache = new LruCache<>("access");
 		m_SystemAccessCache.setReachable(true);
@@ -85,7 +87,7 @@ public class ServiceAccessProvider implements AccessProvider, PluginListener, Se
 		};
 
 		m_IdGenerator = new SimpleIdGenerator(gatewayId);
-		
+
 		GcCleaner.register(this);
 	}
 
@@ -99,17 +101,31 @@ public class ServiceAccessProvider implements AccessProvider, PluginListener, Se
 
 	@Override
 	public String getKind() {
-		return Access.KIND_SERVICE;
+		return KIND;
 	}
 
 	@Override
 	public void onPluginLoad(Pluginable plugin) {
 		if (plugin instanceof ServiceAccessVoFactory) {
 			m_AccessVoFactory = (ServiceAccessVoFactory) plugin;
-			m_AccessVoFactory.registerReloadListener(this);
+			m_AccessVoFactory.registerReloadListener(new ServiceAccessVoFactory.ReloadListener<ServiceAccessVo>() {
+
+				@Override
+				public void onReload(ServiceAccessVo accessVo) {
+					ServiceAccessProvider.this.onReload(accessVo);
+				}
+
+			});
 		} else if (plugin instanceof MasterKeyVoFactory) {
 			m_MasterKeyVoFactory = (MasterKeyVoFactory) plugin;
-			m_MasterKeyVoFactory.registerReloadListener(this);
+			m_MasterKeyVoFactory.registerReloadListener(new MasterKeyVoFactory.ReloadListener<MasterKeyVo>() {
+
+				@Override
+				public void onReload(MasterKeyVo keyVo) {
+					ServiceAccessProvider.this.onReload(keyVo);
+				}
+
+			});
 		}
 	}
 
@@ -289,17 +305,24 @@ public class ServiceAccessProvider implements AccessProvider, PluginListener, Se
 
 	@Override
 	public ResultPage<AccessExt> listAccess(String groupId, String keyword) {
-		StringBuilder prefix = new StringBuilder();
-		prefix.append(getKind()).append(Access.SPEARATOR);
+		StringBuilder sb = new StringBuilder();
+		sb.append(KIND_PREFIX);
 		if (!StringUtil.isEmpty(groupId)) {
 			MasterKey mk = getMasterKeyByGroupId(groupId);
 			if (null == mk) {
 				return ResultPageHelper.empty();
 			}
-			prefix.append(mk.getId()).append(Access.SPEARATOR);
+			sb.append(mk.getId()).append(Access.SPEARATOR);
+		}
+		String prefix = sb.toString();
+		if (!StringUtil.isEmpty(keyword) && keyword.startsWith(prefix)) {
+			AccessExt acc = getAccessInner(keyword);
+			if(null != acc) {
+				return ResultPageHelper.singleton(acc);
+			}
 		}
 
-		ResultPage<String> ids = m_AccessVoFactory.startsWithOfId(prefix.toString());
+		ResultPage<String> ids = m_AccessVoFactory.startsWithOfId(prefix);
 		ResultPage<AccessExt> accesses = new TransResultPage<AccessExt, String>(ids) {
 
 			@Override
@@ -334,7 +357,7 @@ public class ServiceAccessProvider implements AccessProvider, PluginListener, Se
 		return groups;
 	}
 
-	@Override
+	// @Override
 	public void onReload(ServiceAccessVo accessVo) {
 		if (_Logger.isTraceEnabled()) {
 			_Logger.trace("onReload:" + accessVo.id);
@@ -347,7 +370,7 @@ public class ServiceAccessProvider implements AccessProvider, PluginListener, Se
 		acc.updateVo(accessVo);
 	}
 
-	@Override
+	// @Override
 	public void onReload(MasterKeyVo vo) {
 		if (_Logger.isTraceEnabled()) {
 			_Logger.trace("onReload:" + vo.id);

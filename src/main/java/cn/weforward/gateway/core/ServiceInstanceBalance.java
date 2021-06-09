@@ -22,15 +22,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import cn.weforward.common.NameItem;
 import cn.weforward.common.util.LruCache;
 import cn.weforward.common.util.StringUtil;
+import cn.weforward.common.util.TransList;
 import cn.weforward.gateway.Configure;
 import cn.weforward.gateway.ServiceInstance;
 import cn.weforward.gateway.StreamTunnel;
 import cn.weforward.gateway.Tunnel;
 import cn.weforward.gateway.exception.BalanceException;
-import cn.weforward.gateway.exception.QuotasException;
 import cn.weforward.gateway.exception.DebugServiceException;
+import cn.weforward.gateway.exception.QuotasException;
 import cn.weforward.gateway.ops.trace.ServiceTracer;
 import cn.weforward.protocol.Access;
 import cn.weforward.protocol.Header;
@@ -42,16 +44,18 @@ import cn.weforward.protocol.doc.ServiceDocument;
 import cn.weforward.protocol.exception.WeforwardException;
 import cn.weforward.protocol.ext.Producer;
 import cn.weforward.protocol.ops.AccessExt;
+import cn.weforward.protocol.ops.ServiceExt;
 import cn.weforward.protocol.ops.traffic.TrafficTableItem;
+import io.micrometer.core.instrument.MeterRegistry;
 
 /**
- * 微服务实例端点的调度器
+ * 微服务实例的调度器
  * 
  * @author zhangpengji
  *
  */
-public class ServiceEndpointBalance {
-	static final Logger _Logger = LoggerFactory.getLogger(ServiceEndpointBalance.class);
+public class ServiceInstanceBalance {
+	static final Logger _Logger = LoggerFactory.getLogger(ServiceInstanceBalance.class);
 
 	protected GatewayImpl m_Gateway;
 	protected String m_Name;
@@ -65,10 +69,14 @@ public class ServiceEndpointBalance {
 	/** 微服务文档的加载锁 */
 	private final Object m_DocLock = new Object();
 
-	public ServiceEndpointBalance(GatewayImpl gateway, String name) {
+	public ServiceInstanceBalance(GatewayImpl gateway, String name) {
 		m_Gateway = gateway;
 		m_Name = name;
 		m_Concurrent = new AtomicInteger(0);
+	}
+	
+	public String getName() {
+		return m_Name;
 	}
 
 	public synchronized void reinit(List<ServiceInstance> services) {
@@ -90,7 +98,43 @@ public class ServiceEndpointBalance {
 		}
 		m_Endpoints = elements;
 	}
-	
+
+	public long getRpcCount() {
+		ServiceEndpoint[] endpoints = m_Endpoints;
+		if (null == endpoints) {
+			return 0;
+		}
+		long count = 0;
+		for (ServiceEndpoint ep : endpoints) {
+			count += ep.times;
+		}
+		return count;
+	}
+
+	public long getRpcConcurrent() {
+		ServiceEndpoint[] endpoints = m_Endpoints;
+		if (null == endpoints) {
+			return 0;
+		}
+		long count = 0;
+		for (ServiceEndpoint ep : endpoints) {
+			count += ep.concurrent;
+		}
+		return count;
+	}
+
+	public long getRpcFail() {
+		ServiceEndpoint[] endpoints = m_Endpoints;
+		if (null == endpoints) {
+			return 0;
+		}
+		long count = 0;
+		for (ServiceEndpoint ep : endpoints) {
+			count += ep.failTotal;
+		}
+		return count;
+	}
+
 	public int getEndpointCount() {
 		return null == m_Endpoints ? 0 : m_Endpoints.length;
 	}
@@ -216,7 +260,12 @@ public class ServiceEndpointBalance {
 			return null;
 		}
 		service.setInaccessible(false);
+
 		ServiceEndpoint ep = ServiceEndpoint.openEndpoint(this, service, rule);
+		MeterRegistry registry = m_Gateway.m_MeterRegistry;
+		if (null != ep && null != registry) {
+			ep.startGauge(m_Gateway.m_ServerId, registry);
+		}
 		return ep;
 	}
 
@@ -257,9 +306,13 @@ public class ServiceEndpointBalance {
 	// }
 	// return valids;
 	// }
-
+	
 	ServiceEndpoint get(String no, String version) throws BalanceException {
-		return get(no, version, Collections.emptyList());
+		return get(no, version, Collections.emptyList(), false);
+	}
+	
+	ServiceEndpoint get(String no, String version, List<String> excludeNos) throws BalanceException {
+		return get(no, version, excludeNos, false);
 	}
 
 	/**
@@ -274,7 +327,7 @@ public class ServiceEndpointBalance {
 	 * @see #free(ServiceEndpoint, int)
 	 * @throws BalanceException
 	 */
-	ServiceEndpoint get(String no, String version, List<String> excludeNos) throws BalanceException {
+	ServiceEndpoint get(String no, String version, List<String> excludeNos, boolean onlySelfMesh) throws BalanceException {
 		int concurrent = m_Concurrent.get();
 		int quota = getQuotas().getQuota(m_Name, concurrent);
 		if (concurrent > quota) {
@@ -288,6 +341,9 @@ public class ServiceEndpointBalance {
 		} else if (ResponseConstants.FORWARD_TO_BACKUP.equals(no)) {
 			onlyBackup = true;
 			no = null;
+		}
+		if(null == excludeNos) {
+			excludeNos = Collections.emptyList();
 		}
 		ServiceEndpoint[] eps = m_Endpoints;
 		if (1 == eps.length) {
@@ -315,6 +371,9 @@ public class ServiceEndpointBalance {
 				}
 				if ((onlyBackup && !best.isBackup()) || best.matchNos(excludeNos)) {
 					throw BalanceException.exclude(m_Name, String.valueOf(best));
+				}
+				if (onlySelfMesh && !best.isSelfMesh()) {
+					throw BalanceException.noSelfMesh(m_Name, String.valueOf(best));
 				}
 				// best.use();
 				use(best);
@@ -356,6 +415,9 @@ public class ServiceEndpointBalance {
 				continue;
 			}
 			if (element.matchNos(excludeNos)) {
+				continue;
+			}
+			if (onlySelfMesh && !element.isSelfMesh()) {
 				continue;
 			}
 
@@ -402,6 +464,9 @@ public class ServiceEndpointBalance {
 					continue;
 				}
 				if (element.matchNos(excludeNos)) {
+					continue;
+				}
+				if (onlySelfMesh && !element.isSelfMesh()) {
 					continue;
 				}
 
@@ -458,17 +523,56 @@ public class ServiceEndpointBalance {
 			// Quotas quotas = m_Quotas;
 			// if (null == quotas) {
 			err = "全忙{fail:" + failCount + ",over:" + overloadCount + ",exclude:" + excludeNos + ",backup:" + onlyBackup
-					+ ",res:" + Arrays.toString(eps) + "}";
+					+ ",mesh:" + onlySelfMesh + ",res:" + Arrays.toString(eps) + "}";
 			// } else {
 			// err = "全忙{fail:" + failCount + ",over:" + overloadCount +
 			// ",quotas:" + quotas
 			// + "res:" + element + "}";
 			// }
-			throw BalanceException.notFound(m_Name, err);
+			throw BalanceException.allBusy(m_Name, err);
 		}
 
 		m_EndpointValids = valids;
 		best.currentWeight -= total;
+		// best.use();
+		use(best);
+		return best;
+	}
+
+	/**
+	 * 指定编号获取微服务实例端点
+	 * <p>
+	 * 使用完成后回调<code>free()</code>方法
+	 *
+	 * @param no
+	 * @param excludes
+	 * @return
+	 * @see #free(ServiceEndpoint, int)
+	 * @throws BusyException
+	 */
+	ServiceEndpoint select(String no) throws BalanceException {
+		if (StringUtil.isEmpty(no)) {
+			throw BalanceException.noNotMatch(m_Name, "无匹配的编号:" + no);
+		}
+		
+		ServiceEndpoint[] eps = m_Endpoints;
+		ServiceEndpoint best = null;
+		for (ServiceEndpoint ep : eps) {
+			if (!ep.matchNo(no)) {
+				continue;
+			}
+			best = ep;
+			if (best.isOverload()) {
+				throw BalanceException.overload(m_Name, String.valueOf(best));
+			}
+			if (best.isFailDuring()) {
+				throw BalanceException.failDuring(m_Name, String.valueOf(best));
+			}
+			break;
+		}
+		if (null == best) {
+			throw BalanceException.noNotMatch(m_Name, "无匹配的编号:" + no);
+		}
 		// best.use();
 		use(best);
 		return best;
@@ -497,46 +601,6 @@ public class ServiceEndpointBalance {
 		}
 		return result;
 	}
-
-	// /**
-	// * 指定编号获取微服务实例端点
-	// * <p>
-	// * 使用完成后回调<code>free()</code>方法
-	// *
-	// * @param no
-	// * @param excludes
-	// * @return
-	// * @see #free(ServiceEndpoint, int)
-	// * @throws BusyException
-	// */
-	// ServiceEndpoint appoint(String no, List<String> excludes) throws
-	// BusyException {
-	// if (StringUtil.isEmpty(no)) {
-	// return get(null, null, excludes);
-	// }
-	// if (ResponseConstants.FORWARD_TO_BACKUP.equals(no)) {
-	// return get(no, null, excludes);
-	// }
-	// ServiceEndpoint[] eps = m_Endpoints;
-	// ServiceEndpoint best = null;
-	// for (ServiceEndpoint ep : eps) {
-	// if (!ep.matchNo(no)) {
-	// continue;
-	// }
-	// best = ep;
-	// if (best.isOverload()) {
-	// throw BusyException.overload(m_Name, String.valueOf(best));
-	// }
-	// if (best.isFailDuring()) {
-	// throw BusyException.failDuring(m_Name, String.valueOf(best));
-	// }
-	// }
-	// if (null == best) {
-	// throw BusyException.noNotMatch(m_Name, "无匹配的编号:" + no);
-	// }
-	// best.use();
-	// return best;
-	// }
 
 	private void use(ServiceEndpoint endpoint) throws BalanceException {
 		int concurrent = m_Concurrent.get();
@@ -574,18 +638,18 @@ public class ServiceEndpointBalance {
 			tunnel.responseError(null, WeforwardException.CODE_SERVICE_NOT_FOUND, "微服务[" + m_Name + "]无可用实例");
 			return;
 		}
-
+		
 		if (Header.CHANNEL_NOTIFY.equals(tunnel.getHeader().getChannel())) {
-			// 由EventBridger接管通知处理
-			NotifyBridger eventBridger;
+			// 由NotifyBridger接管通知处理
+			NotifyBridger bridger;
 			try {
-				eventBridger = new NotifyBridger(this, tunnel);
+				bridger = new NotifyBridger(this, tunnel);
 			} catch (Throwable e) {
 				_Logger.error(e.toString(), e);
 				tunnel.responseError(null, WeforwardException.CODE_INTERNAL_ERROR, "内部错误");
 				return;
 			}
-			eventBridger.connect();
+			bridger.connect();
 			return;
 		}
 
@@ -624,6 +688,31 @@ public class ServiceEndpointBalance {
 		}
 		forwardBridger.connect(ep);
 	}
+	
+	public void jointByMesh(Tunnel tunnel) {
+		String serviceNo = tunnel.getHeader().getServiceNo();
+		ServiceEndpoint ep;
+		try {
+			ep = select(serviceNo);
+		} catch (BalanceException e) {
+			_Logger.warn(e.toString());
+			int code;
+			if(BalanceException.CODE_NO_NOT_MATCH.id == e.getCode() || BalanceException.CODE_FAIL_DURING.id == e.getCode()) {
+				code =  WeforwardException.CODE_SERVICE_UNAVAILABLE;
+			} else {
+				code = WeforwardException.CODE_SERVICE_BUSY;
+			}
+			tunnel.responseError(null, code, "微服务[" + m_Name + "]网格中继失败：" + e.getKeyword());
+			return;
+		}
+		if (null != ep.getService().getMeshNode()) {
+			tunnel.responseError(null, WeforwardException.CODE_INVOKE_DENIED,
+					"微服务实例[" + ep.getService().toStringNameNo() + "]不在此网格");
+			return;
+		}
+		ep.connect(tunnel, false);
+		return;
+	}
 
 	public void joint(StreamTunnel tunnel) {
 		if (null == m_Endpoints) {
@@ -632,7 +721,7 @@ public class ServiceEndpointBalance {
 		}
 		ServiceEndpoint ep;
 		try {
-			ep = get(null, null);
+			ep = get(null, null, null, true);
 		} catch (BalanceException e) {
 			_Logger.warn("微服务[" + m_Name + "]忙：" + e.getMessage());
 			int code = (e instanceof QuotasException) ? StreamTunnel.CODE_UNAVAILABLE
@@ -672,9 +761,15 @@ public class ServiceEndpointBalance {
 				SimpleDocument doc = getDocumentInCache(ver);
 				if (null == doc || doc.isTimeout()) {
 					doc = ep.getDocument();
-					putDocumentToCache(ver, doc);
+					if (null != doc) {
+						putDocumentToCache(ver, doc);
+					}
 				}
-				return Collections.singletonList(doc);
+				if (null != doc) {
+					return Collections.singletonList(doc);
+				} else {
+					return Collections.emptyList();
+				}
 			}
 			// 多实例
 			Map<String, SimpleDocument> docs = new HashMap<String, SimpleDocument>();
@@ -738,6 +833,47 @@ public class ServiceEndpointBalance {
 			throw new DebugServiceException("微服务[" + m_Name + "]无此实例[" + no + "]");
 		}
 		return target.debug(source, name, args);
+	}
+
+	public NameItem getEndpointSummary() {
+		ServiceEndpoint[] eps = m_Endpoints;
+		if (null == eps || 0 == eps.length) {
+			return NameItem.valueOf("无可用实例", 9);
+		}
+		boolean allNorm = true;
+		boolean allAbnorm = true;
+		for (ServiceEndpoint ep : eps) {
+			int state = ep.getService().getState();
+			if (0 == state) {
+				allAbnorm = false;
+				continue;
+			}
+			if (0 != state && ServiceExt.STATE_INACCESSIBLE != state) {
+				allNorm = false;
+				continue;
+			}
+		}
+		if (allNorm) {
+			return NameItem.valueOf("正常", 0);
+		}
+		if (allAbnorm) {
+			return NameItem.valueOf("全异常", 9);
+		}
+		return NameItem.valueOf("部分异常", 5);
+	}
+	
+	public List<ServiceInstance> listServiceInstance(){
+		List<ServiceEndpoint> eps = list();
+		if(eps.isEmpty()) {
+			return Collections.emptyList();
+		}
+		return new TransList<ServiceInstance, ServiceEndpoint>(eps) {
+
+			@Override
+			protected ServiceInstance trans(ServiceEndpoint src) {
+				return src.getService();
+			}
+		};
 	}
 
 	@Override

@@ -25,6 +25,7 @@ import cn.weforward.common.io.OutputStreamNio;
 import cn.weforward.gateway.Pipe;
 import cn.weforward.gateway.Tunnel;
 import cn.weforward.gateway.exception.BalanceException;
+import cn.weforward.protocol.Header;
 import cn.weforward.protocol.Service;
 import cn.weforward.protocol.exception.WeforwardException;
 
@@ -38,7 +39,7 @@ class ForwardBridger {
 	// static final Logger _Logger = ServiceEndpointBalance._Logger;
 	static final Logger _Logger = LoggerFactory.getLogger(ForwardBridger.class);
 
-	ServiceEndpointBalance m_Balance;
+	ServiceInstanceBalance m_Balance;
 	TunnelWrap m_TunnelWrap;
 	PipeWrap m_PipeWrap;
 
@@ -48,7 +49,7 @@ class ForwardBridger {
 	volatile InputStream m_TransferBuffer;
 	volatile boolean m_End;
 
-	ForwardBridger(ServiceEndpointBalance balance, Tunnel tunnel, int maxForward) throws IOException {
+	ForwardBridger(ServiceInstanceBalance balance, Tunnel tunnel, int maxForward) throws IOException {
 		m_TransferBuffer = tunnel.mirrorTransferStream();
 
 		m_Balance = balance;
@@ -149,8 +150,8 @@ class ForwardBridger {
 			}
 
 			// 尝试转发
-			if (_Logger.isInfoEnabled()) {
-				_Logger.info(msg + "，已到达：" + m_Connected);
+			if (_Logger.isDebugEnabled()) {
+				_Logger.debug(msg + "，已到达：" + m_Connected);
 			}
 			if (!checkCount() || null == m_TransferBuffer) {
 				msg = msg + "，但被拒绝";
@@ -317,6 +318,11 @@ class ForwardBridger {
 		@Override
 		public Service getService() {
 			return m_Pipe.getService();
+		}
+		
+		@Override
+		public Header getHeader() {
+			return m_Pipe.getHeader();
 		}
 
 		@Override

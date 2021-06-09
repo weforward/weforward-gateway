@@ -35,10 +35,11 @@ import cn.weforward.protocol.ops.AccessExt;
  * @author zhangpengji
  *
  */
-public class RightManageImpl implements RightManage, PluginListener, RightTableVoFactory.ReloadListener, GcCleanable {
+public class RightManageImpl implements RightManage, PluginListener, RightTableVoFactory.ReloadListener<RightTableVo>, GcCleanable {
 
 	InternalRightTable m_KeeperTable;
 	InternalRightTable m_DistributedTable;
+	InternalRightTable m_MeshTable;
 	// Map<String, RightTableExt> m_InternalRights;
 	LruCache<String, RightTable> m_RightTableCache;
 	LruCache.Loader<String, RightTable> m_RightTableLoader;
@@ -50,6 +51,7 @@ public class RightManageImpl implements RightManage, PluginListener, RightTableV
 		// 内置权限
 		m_KeeperTable = genKeeperRightTable();
 		m_DistributedTable = genDistributedRightTable();
+		m_MeshTable = genMeshRightTable();
 		// m_InternalRights = new HashMap<>();
 		// m_InternalRights.put(keeperTable.getName(), keeperTable);
 		// m_InternalRights.put(distributed.getName(), distributed);
@@ -92,6 +94,12 @@ public class RightManageImpl implements RightManage, PluginListener, RightTableV
 			table.addInternalItem("旧网关过渡", null, Access.KIND_SERVICE, null);
 			table.addInternalItem("新网关过渡", null, null, null);
 		}
+		return table;
+	}
+
+	private InternalRightTable genMeshRightTable() {
+		InternalRightTable table = new InternalRightTable(this, ServiceName.MESH.name);
+		table.addInternalItem(AccessExt.GATEWAY_INTERNAL_ACCESS_ID);
 		return table;
 	}
 
@@ -192,6 +200,9 @@ public class RightManageImpl implements RightManage, PluginListener, RightTableV
 
 		if (m_DistributedTable.getName().equals(serviceName)) {
 			return m_DistributedTable;
+		}
+		if (m_MeshTable.getName().equals(serviceName)) {
+			return m_MeshTable;
 		}
 		if (m_KeeperTable.getName().equals(serviceName)) {
 			return m_KeeperTable;

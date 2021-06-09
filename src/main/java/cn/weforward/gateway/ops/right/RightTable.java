@@ -10,8 +10,11 @@
  */
 package cn.weforward.gateway.ops.right;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
+import cn.weforward.common.util.ListUtil;
 import cn.weforward.gateway.ops.TableItemHelper;
 import cn.weforward.gateway.ops.TableItemHelper.NameChecker;
 import cn.weforward.gateway.ops.right.RightTableVo.RightTableItemVo;
@@ -55,8 +58,12 @@ public class RightTable extends AbstractTable {
 	}
 
 	protected List<RightTableItemVo> getItemVos() {
-		return getVo().items;
-	};
+		List<RightTableItemVo> items = getVo().items;
+		if (null == items) {
+			return Collections.emptyList();
+		}
+		return items;
+	}
 
 	@Override
 	public synchronized void appendItem(RightTableItem item) {
@@ -95,4 +102,17 @@ public class RightTable extends AbstractTable {
 		markUpdate();
 	}
 
+	@Override
+	public void setItems(List<RightTableItem> items) {
+		List<RightTableItemVo> vos = Collections.emptyList();
+		if (!ListUtil.isEmpty(items)) {
+			vos = new ArrayList<>(items.size());
+			for (RightTableItem item : items) {
+				RightTableItemVo vo = RightTableItemVo.valueOf(item);
+				vos.add(vo);
+			}
+		}
+		getVo().items = vos;
+		markUpdate();
+	}
 }

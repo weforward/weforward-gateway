@@ -10,8 +10,6 @@
  */
 package cn.weforward.gateway.ops.trace;
 
-import java.util.concurrent.TimeUnit;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,12 +17,12 @@ import cn.weforward.common.crypto.Hex;
 import cn.weforward.common.sys.Timestamp;
 import cn.weforward.common.util.StringUtil;
 import cn.weforward.gateway.ServiceInstance;
-import cn.weforward.metrics.WeforwadMetrics;
+import cn.weforward.metrics.WeforwardMetrics;
 import cn.weforward.protocol.ops.trace.ServiceTraceToken;
 import cn.weforward.protocol.ops.trace.SimpleServiceTraceToken;
-import io.micrometer.core.instrument.MeterRegistry;
+import cn.weforward.trace.GatewayTrace;
+import cn.weforward.trace.TraceRegistry;
 import io.micrometer.core.instrument.Tags;
-import io.micrometer.core.instrument.TimeGauge;
 
 /**
  * 基于Metrics的跟踪器实现
@@ -38,15 +36,15 @@ public class MetricsServiceTracer implements ServiceTracer {
 	Timestamp m_Timestamp;
 	String m_ServiceId;
 
-	MeterRegistry m_MeterRegistry;
+	TraceRegistry m_TraceRegistry;
 
 	public MetricsServiceTracer(String serviceId) {
 		m_ServiceId = serviceId;
 		m_Timestamp = Timestamp.getInstance(Timestamp.POLICY_DEFAULT);
 	}
 
-	public void setMeterRegistry(MeterRegistry registry) {
-		m_MeterRegistry = registry;
+	public void setTraceRegistry(TraceRegistry registry) {
+		m_TraceRegistry = registry;
 	}
 
 	@Override
@@ -72,32 +70,28 @@ public class MetricsServiceTracer implements ServiceTracer {
 	}
 
 	protected void gaugeBegin(Token token) {
-		MeterRegistry registry = m_MeterRegistry;
+		TraceRegistry registry = m_TraceRegistry;
 		if (null == registry) {
 			return;
 		}
 		if (StringUtil.isEmpty(token.getToken())) {
 			return;
 		}
-		try {
-			TimeGauge.builder(WeforwadMetrics.TRACE_START_TIME, System.currentTimeMillis(), TimeUnit.MILLISECONDS,
-					Long::longValue).tags(token.getTags()).register(registry);
-		} catch (Throwable e) {
-			_Logger.error(e.toString(), e);
-		}
+		token.setBeginTime(System.currentTimeMillis());
 	}
 
 	protected void gaugeFinish(Token token) {
-		if(null == token || StringUtil.isEmpty(token.getToken())) {
+		if (null == token || StringUtil.isEmpty(token.getToken())) {
 			return;
 		}
-		MeterRegistry registry = m_MeterRegistry;
+		TraceRegistry registry = m_TraceRegistry;
 		if (null == registry) {
 			return;
 		}
 		try {
-			TimeGauge.builder(WeforwadMetrics.TRACE_END_TIME, System.currentTimeMillis(), TimeUnit.MILLISECONDS,
-					Long::longValue).tags(token.getTags()).register(registry);
+			Tags tags = token.getTags();
+			registry.register(GatewayTrace.newTrace(token.getSpanId(), token.getParentId(), token.getTraceId(),
+					token.m_BeginTime, System.currentTimeMillis() - token.m_BeginTime, tags));
 		} catch (Throwable e) {
 			_Logger.error(e.toString(), e);
 		}
@@ -156,6 +150,7 @@ public class MetricsServiceTracer implements ServiceTracer {
 		String m_SpanId;
 		int m_Depth;
 		String m_ParentId;
+		long m_BeginTime;
 		ServiceInstance m_Service;
 
 		Token(String spanId, ServiceTraceToken pre) {
@@ -180,6 +175,10 @@ public class MetricsServiceTracer implements ServiceTracer {
 
 		void setService(ServiceInstance service) {
 			m_Service = service;
+		}
+
+		void setBeginTime(long time) {
+			m_BeginTime = time;
 		}
 
 		@Override
@@ -236,11 +235,11 @@ public class MetricsServiceTracer implements ServiceTracer {
 		}
 
 		Tags getTags() {
-			return WeforwadMetrics.TagHelper.of(WeforwadMetrics.TagHelper.traceId(m_TraceId),
-					WeforwadMetrics.TagHelper.traceSpanId(m_SpanId),
-					WeforwadMetrics.TagHelper.traceParentId(m_ParentId),
-					WeforwadMetrics.TagHelper.serviceName(m_Service.getName()),
-					WeforwadMetrics.TagHelper.serviceNo(m_Service.getNo()));
+			return WeforwardMetrics.TagHelper.of(WeforwardMetrics.TagHelper.traceId(m_TraceId),
+					WeforwardMetrics.TagHelper.traceSpanId(m_SpanId),
+					WeforwardMetrics.TagHelper.traceParentId(m_ParentId),
+					WeforwardMetrics.TagHelper.serviceName(m_Service.getName()),
+					WeforwardMetrics.TagHelper.serviceNo(m_Service.getNo()));
 		}
 	}
 }

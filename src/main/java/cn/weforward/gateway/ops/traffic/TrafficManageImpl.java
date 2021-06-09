@@ -32,7 +32,7 @@ import cn.weforward.protocol.ops.traffic.TrafficTableItem;
  *
  */
 public class TrafficManageImpl
-		implements TrafficManage, PluginListener, TrafficTableVoFactory.ReloadListener, GcCleanable {
+		implements TrafficManage, PluginListener, TrafficTableVoFactory.ReloadListener<TrafficTableVo>, GcCleanable {
 
 	LruCache<String, TrafficTable> m_TrafficTableCache;
 	LruCache.Loader<String, TrafficTable> m_TrafficTableLoader;
@@ -52,7 +52,7 @@ public class TrafficManageImpl
 			public TrafficTable load(String key, CacheNode<String, TrafficTable> node) {
 				TrafficTableVoFactory factory = m_VoFactory;
 				if (null == factory) {
-					_Logger.warn("初始化VoFactory");
+					_Logger.warn("未初始化VoFactory");
 					return null;
 				}
 				TrafficTableVo vo = factory.get(key);

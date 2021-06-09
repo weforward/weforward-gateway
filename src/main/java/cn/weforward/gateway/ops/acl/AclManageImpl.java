@@ -27,7 +27,7 @@ import cn.weforward.protocol.Access;
  * @author zhangpengji
  *
  */
-public class AclManageImpl implements AclManage, PluginListener, AclTableVoFactory.ReloadListener, GcCleanable {
+public class AclManageImpl implements AclManage, PluginListener, AclTableVoFactory.ReloadListener<AclTableVo>, GcCleanable {
 
 	LruCache<String, AclTable> m_AclTableCache;
 	LruCache.Loader<String, AclTable> m_AclTableLoader;
@@ -122,10 +122,12 @@ public class AclManageImpl implements AclManage, PluginListener, AclTableVoFacto
 
 	@Override
 	public int findResourceRight(String serviceName, Access access, String resId) {
-		AclTable table = getAclTableByName(serviceName);
-		if (null == table) {
-			return 0;
-		}
+		// AclTable table = getAclTableByName(serviceName);
+		// if (null == table) {
+		// return 0;
+		// }
+		// 服务名应该都是有效的，openAclTable可避免频繁加载空项
+		AclTable table = openAclTable(serviceName);
 		return table.findResourceRight(access, resId);
 	}
 
@@ -144,9 +146,9 @@ public class AclManageImpl implements AclManage, PluginListener, AclTableVoFacto
 
 	@Override
 	public void onGcCleanup(int policy) {
-		if (POLICY_CRITICAL != policy) {
-			return;
-		}
+		// if (POLICY_CRITICAL != policy) {
+		// return;
+		// }
 		if (null != m_AclTableCache) {
 			m_AclTableCache.onGcCleanup(policy);
 		}

@@ -86,8 +86,8 @@ public abstract class ImitatedTunnel implements Tunnel {
 		return m_WaitTimeout;
 	}
 
-	public void setWaitTimeout(int timeout) {
-		m_WaitTimeout = timeout;
+	public void setWaitTimeout(int second) {
+		m_WaitTimeout = second;
 	}
 
 	@Override

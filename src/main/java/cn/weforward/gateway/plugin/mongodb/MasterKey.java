@@ -23,7 +23,7 @@ import cn.weforward.gateway.plugin.mongodb.di.MasterKeyDi;
  * @author zhangpengji
  *
  */
-public class MasterKey extends AbstractPersistent<MasterKeyDi> {// implements Reloadable<MasterKey>
+public class MasterKey extends AbstractPersistent<MasterKeyDi> implements VoPersistent<MasterKeyVo> {
 
 	@Resource
 	MasterKeyVo m_Vo;
@@ -39,12 +39,14 @@ public class MasterKey extends AbstractPersistent<MasterKeyDi> {// implements Re
 		markPersistenceUpdate();
 	}
 
-	void updateVo(MasterKeyVo vo) {
+	@Override
+	public void updateVo(MasterKeyVo vo) {
 		m_Vo = vo;
 		markPersistenceUpdate();
 	}
 
-	MasterKeyVo getVo() {
+	@Override
+	public MasterKeyVo getVo() {
 		return m_Vo;
 	}
 
@@ -60,12 +62,13 @@ public class MasterKey extends AbstractPersistent<MasterKeyDi> {// implements Re
 	// return true;
 	// }
 
-	boolean reload(MasterKey other) {
+	@Override
+	public boolean reload(VoPersistent<MasterKeyVo> other) {
 		if (null == other) {
 			return false;
 		}
 		synchronized (this) {
-			m_Vo = other.m_Vo;
+			m_Vo = ((MasterKey) other).m_Vo;
 		}
 		return true;
 	}

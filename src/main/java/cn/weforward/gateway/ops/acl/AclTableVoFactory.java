@@ -10,8 +10,8 @@
  */
 package cn.weforward.gateway.ops.acl;
 
-import cn.weforward.common.ResultPage;
 import cn.weforward.gateway.Pluginable;
+import cn.weforward.gateway.ops.VoFactory;
 
 /**
  * <code>AclTableVo</code>工厂
@@ -19,48 +19,5 @@ import cn.weforward.gateway.Pluginable;
  * @author zhangpengji
  *
  */
-public interface AclTableVoFactory extends Pluginable {
-
-	/**
-	 * 按id获取AclTableVo
-	 * 
-	 * @param id
-	 * @return
-	 */
-	AclTableVo get(String id);
-
-	/**
-	 * 置入一个AclTableVo
-	 * 
-	 * @param aclTableVo
-	 */
-	void put(AclTableVo aclTableVo);
-
-	/**
-	 * 按id前缀搜索
-	 * 
-	 * @param prefix
-	 * @return
-	 */
-	ResultPage<AclTableVo> startsWith(String prefix);
-
-	/**
-	 * 注册重载监听器
-	 *
-	 * @param listener
-	 */
-	void registerReloadListener(ReloadListener listener);
-
-	/**
-	 * 注销重载监听器
-	 *
-	 * @param listener
-	 * @return 注销成功返回true
-	 */
-	boolean unregisterReloadListener(ReloadListener listener);
-
-	interface ReloadListener {
-
-		void onReload(AclTableVo aclTableVo);
-	}
+public interface AclTableVoFactory extends VoFactory<AclTableVo>, Pluginable {
 }

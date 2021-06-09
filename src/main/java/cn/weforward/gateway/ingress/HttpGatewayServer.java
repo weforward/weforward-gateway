@@ -187,6 +187,8 @@ public class HttpGatewayServer implements ServerHandlerFactory {
 						--idx;
 					}
 					ip = (idx > 0) ? fip.substring(0, idx + 1) : fip;
+				} else if (_Logger.isTraceEnabled()) {
+					_Logger.trace("'X-Forwarded-For' is empry, from:" + ip);
 				}
 			}
 		}
@@ -201,6 +203,11 @@ public class HttpGatewayServer implements ServerHandlerFactory {
 			return new CheckFromResult(ip, true);
 		}
 		return new CheckFromResult(ip, null);
+	}
+
+	protected boolean checkMeshForward(HttpContext ctx) {
+		HttpHeaders headers = ctx.getRequestHeaders();
+		return null != headers && !StringUtil.isEmpty(headers.get(HttpConstants.WF_MESH_AUTH));
 	}
 
 	private int getMethod(String method) {
@@ -277,6 +284,9 @@ public class HttpGatewayServer implements ServerHandlerFactory {
 	}
 
 	private ServerHandler openTunnel(HttpContext ctx, CheckFromResult cfr) throws IOException {
+		if(checkMeshForward(ctx)) {
+			return new HttpMeshTunnel(ctx, m_Supporter, cfr.realIp, Boolean.TRUE.equals(cfr.trust));
+		}
 		if (Configure.getInstance().isCompatMode()) {
 			return new HttpHyTunnel(ctx, m_Supporter, cfr.realIp, Boolean.TRUE.equals(cfr.trust));
 		} else {

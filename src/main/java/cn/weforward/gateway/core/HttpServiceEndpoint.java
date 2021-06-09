@@ -14,11 +14,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URLEncoder;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.RejectedExecutionException;
 
+import cn.weforward.common.crypto.Base64;
 import cn.weforward.common.execption.InvalidFormatException;
 import cn.weforward.common.io.BytesOutputStream;
 import cn.weforward.common.json.JsonInput;
@@ -31,6 +33,7 @@ import cn.weforward.common.util.Bytes;
 import cn.weforward.common.util.StringBuilderPool;
 import cn.weforward.common.util.StringUtil;
 import cn.weforward.gateway.Configure;
+import cn.weforward.gateway.MeshNode;
 import cn.weforward.gateway.Pipe;
 import cn.weforward.gateway.ServiceInstance;
 import cn.weforward.gateway.StreamPipe;
@@ -74,28 +77,45 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 
 	List<EndpointUrl> m_EndpointUrls;
 
-	public HttpServiceEndpoint(ServiceEndpointBalance group, ServiceInstance service, TrafficTableItem rule) {
+	public HttpServiceEndpoint(ServiceInstanceBalance group, ServiceInstance service, TrafficTableItem rule) {
 		super(group, service, rule);
 		initUrls();
 	}
 
 	private void initUrls() {
-		List<String> urls = m_Service.getUrls();
-		List<EndpointUrl> newUrls;
-		if (1 == urls.size()) {
-			newUrls = Collections.singletonList(new EndpointUrl(urls.get(0)));
+		List<String> urls;
+		if (!isSelfMesh()) {
+			MeshNode node = m_Service.getMeshNode();
+			List<String> prefixs = node.getUrls();
+			urls = new ArrayList<>(prefixs.size());
+			for (String prefix : prefixs) {
+				String url = prefix + m_Service.getName();
+				urls.add(url);
+			}
 		} else {
-			newUrls = new ArrayList<>(urls.size());
+			urls = m_Service.getUrls();
+		}
+		List<EndpointUrl> endpointUrls;
+		if (1 == urls.size()) {
+			endpointUrls = Collections.singletonList(new EndpointUrl(urls.get(0)));
+		} else {
+			endpointUrls = new ArrayList<>(urls.size());
 			for (String url : urls) {
-				newUrls.add(new EndpointUrl(url));
+				endpointUrls.add(new EndpointUrl(url));
 			}
 		}
-		m_EndpointUrls = newUrls;
+		m_EndpointUrls = endpointUrls;
 	}
 
 	@Override
-	protected Pipe openPipe(Tunnel tunnel, ServiceTraceToken token, boolean supportForward) {
-		EndpointPipe pipe = new EndpointPipe(tunnel, getEndpointUrl(), getService(), token, supportForward);
+	protected Pipe openPipe(Tunnel tunnel, boolean supportForward) {
+		EndpointPipe pipe;
+		if (tunnel.isFromMeshForward()) {
+			pipe = new MeshForwardEndpointPipe(tunnel, getEndpointUrl(), getService());
+		} else {
+			ServiceTraceToken token = createTraceToken(tunnel);
+			pipe = new EndpointPipe(tunnel, getEndpointUrl(), getService(), token, supportForward);
+		}
 		pipe.open(getHttpClientFactory(), m_ReadTimeout);
 		return pipe;
 	}
@@ -241,6 +261,11 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 		}
 
 		@Override
+		public Header getHeader() {
+			return m_Header;
+		}
+
+		@Override
 		public String getTag() {
 			String tag;
 			if (Response.Helper.isMark(Response.MARK_KEEP_SERVICE_ORIGIN, m_WfResp.marks)) {
@@ -320,7 +345,7 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 				if (m_Trust) {
 					authType = Header.AUTH_TYPE_NONE;
 				} else {
-					// authType = Header.AUTH_TYPE_AES; FIXME 尚未支持
+					// authType = Header.AUTH_TYPE_AES; 尚未支持
 					authType = Header.AUTH_TYPE_SHA2;
 				}
 				header.setAuthType(authType);
@@ -332,6 +357,17 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 					channel = Header.CHANNEL_RPC;
 				}
 				header.setChannel(channel);
+				if (null != service.getMeshNode()) {
+					// 标识请求来源为网格
+					header.setServiceNo(service.getNo());
+					// XXX 应该把签名过程封装起来
+					MessageDigest md = MessageDigest.getInstance("SHA-256");
+					Access internalAccess = getInternalAccess();
+					md.update((header.getService() + header.getNoise()).getBytes("utf-8"));
+					md.update(internalAccess.getAccessKey());
+					String meshSign = "Mesh-Forward "+internalAccess.getAccessId() + ":" + Base64.encode(md.digest());
+					header.setMeshAuth(meshSign);
+				}
 
 				// 组织wf_req
 				WfReq wfReq = createWfReq(m_Tunnel, m_TraceToken, m_SupportForward);
@@ -525,7 +561,7 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 				}
 				// 读取到“,”分隔符
 				char ch = JsonUtil.skipBlank(jsonInput, 100);
-				if (',' != ch) {
+				if (',' != ch && '}' != ch) {
 					// 格式有问题
 					dumpResponse();
 					responseError(WeforwardException.CODE_ILLEGAL_CONTENT, "未找到'" + wfResp.getName() + "'节点后面的','符号");
@@ -865,6 +901,95 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 		@Override
 		public void run() {
 			connected();
+		}
+	}
+
+	/**
+	 * 处理网格转发的微服务管道
+	 * 
+	 * @author zhangpengji
+	 *
+	 */
+	class MeshForwardEndpointPipe extends EndpointPipe {
+
+		MeshForwardEndpointPipe(Tunnel tunnel, EndpointUrl url, ServiceInstance service) {
+			super(tunnel, url, service, null, false);
+		}
+
+		@Override
+		void connected() {
+			synchronized (this) {
+				if (m_Schedule >= SCHEDULE_OUT_REQ_HEADER) {
+					return;
+				}
+				m_Schedule = SCHEDULE_OUT_REQ_HEADER;
+			}
+			if (_Logger.isTraceEnabled()) {
+				_Logger.trace(getService().getName() + " connected.");
+			}
+
+			try {
+				init();
+
+				Header header = m_Tunnel.getHeader();
+				writeHeader(header);
+				m_RequestOutput = m_Invoker.openRequestWriter();
+			} catch (Throwable e) {
+				responseError(e);
+				return;
+			}
+
+			m_Tunnel.requestReady(this, m_RequestOutput);
+		}
+
+		void parseRespHeader() {
+			synchronized (this) {
+				if (m_Schedule >= SCHEDULE_PARES_RESP_HEADER) {
+					return;
+				}
+				m_Schedule = SCHEDULE_PARES_RESP_HEADER;
+			}
+			try {
+				HttpHeaders hs;
+				hs = m_Invoker.getResponseHeaders();
+				Header header = new Header(getService().getName());
+				HttpServiceEndpoint.this.readHeader(hs, header);
+				m_Header = header;
+			} catch (Throwable e) {
+				responseError(e);
+				return;
+			}
+		}
+		
+		@Override
+		void parseWfResp() {
+			synchronized (this) {
+				if (m_Schedule >= SCHEDULE_PARES_WF_RESP) {
+					return;
+				}
+				m_Schedule = SCHEDULE_PARES_WF_RESP;
+			}
+
+			m_Tunnel.responseReady(this);
+		}
+		
+		@Override
+		public void responseReady(Tunnel tunnel, OutputStream output) {
+			checkTunnel(tunnel);
+
+			try {
+				m_Invoker.responseTransferTo(output, 0);
+			} catch (Throwable e) {
+				responseError(e);
+				return;
+			}
+
+			synchronized (this) {
+				m_Schedule = SCHEDULE_RESPONSE_TRANSFERED;
+			}
+			if (m_Invoker.isResponseCompleted()) {
+				responseCompleted0();
+			}
 		}
 	}
 

@@ -23,7 +23,7 @@
 		<property name="streamUri" value="/__wf_stream/" />
 		<property name="version" value="true" />
 		<!-- 信任的代理IP -->
-		<property name="proxyIps" value="${proxy.ips}" />
+		<property name="proxyIps" value="${proxy.ips:}" />
 		<!-- 只允许指定的IP访问
 		<property name="allowIps"   value="127.0.0.1;192.168.0.0-192.168.0.10" />
 		 -->
@@ -37,7 +37,7 @@
 		<property name="gatewayApis" ref="gatewayApis" />
 		<property name="producer" ref="producer" />
 		<property name="apiExecutor" ref="apiExecutor" />
-		<property name="rpcExecutor" ref="rpcExecutor" />
+		<property name="rpcExecutor" ref="${rpcExecutor:rpcPoolExecutor}" />
 		<property name="docExecutor" ref="docExecutor" />
 		<property name="resourcePreUrl" value="${resource.preUrl}" />
 		<property name="resourceSecret" value="${resource.secret}" />
@@ -51,10 +51,12 @@
 	</bean>
 
 	<!-- 处理rpc,event, stream等请求的任务执行器 -->
-	<bean id="rpcExecutor" class="cn.weforward.common.util.ThreadPool">
+	<bean id="rpcPoolExecutor" class="cn.weforward.common.util.ThreadPool">
 		<constructor-arg index="0" value="256" />
 		<constructor-arg index="1" value="rpc" />
 	</bean>
+	
+	<bean id="rpcDirectExecutor" class="cn.weforward.gateway.util.DirectExecutor" />
 
 	<!-- 处理doc请求的任务执行器 -->
 	<bean id="docExecutor" class="cn.weforward.common.util.ThreadPool">

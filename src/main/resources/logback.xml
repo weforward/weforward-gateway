@@ -15,7 +15,7 @@
 			<MaxHistory>30</MaxHistory>
 		</rollingPolicy>
 		<encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
-			<pattern>%d{yyyyMMdd HH:mm:ss.SSS}[%thread]%-5level %logger{50} %msg%n
+			<pattern>%d{yyyyMMdd HH:mm:ss.SSS}[%thread]%-5level %logger{25} %msg%n
 			</pattern>
 		</encoder>
 	</appender>
@@ -25,7 +25,7 @@
 		<projectName>gateway</projectName>
 		<serverid>${gateway.id}</serverid>
 		<layout class="ch.qos.logback.classic.PatternLayout">
-			<pattern>%d{HH:mm:ss.SSS}[%thread]%-5level %logger{50} %msg%n
+			<pattern>%d{HH:mm:ss.SSS}[%thread]%-5level %logger{25} %msg%n
 			</pattern>
 		</layout>
 	</appender>

@@ -52,7 +52,6 @@ import cn.weforward.protocol.client.ext.RequestInvokeObject;
 import cn.weforward.protocol.datatype.DtList;
 import cn.weforward.protocol.datatype.DtObject;
 import cn.weforward.protocol.ext.Producer;
-import cn.weforward.protocol.ops.ServiceExt;
 import cn.weforward.protocol.support.PageDataMapper;
 import cn.weforward.protocol.support.SimpleProducer;
 import cn.weforward.protocol.support.datatype.SimpleDtList;
@@ -85,8 +84,6 @@ public class DistributeManageImpl
 	protected Map<String, ServiceInstance> m_UnregServices;
 	/** m_RegServices、m_UnregServices的操作锁 */
 	protected final Object m_ServicesLock = new Object();
-	/** 最后收集时间 */
-	protected long m_LastCollect;
 
 	/** 定时任务间隔（毫秒） */
 	protected int m_Interval;
@@ -170,7 +167,7 @@ public class DistributeManageImpl
 		if (m_BrotherNodes.isEmpty()) {
 			return;
 		}
-		List<ServiceExt> services = null;
+		List<ServiceInstance> services = null;
 		Collection<NodeAgent> brothers = m_BrotherNodes.values();
 		for (NodeAgent brother : brothers) {
 			if (!brother.isValid()) {
@@ -178,12 +175,12 @@ public class DistributeManageImpl
 			}
 			try {
 				// 从兄弟节点获取微服务
-				ResultPage<ServiceExt> rp = brother.getServices();
+				ResultPage<ServiceInstance> rp = brother.getServices();
 				if (0 == rp.getCount()) {
 					continue;
 				}
-				services = new ArrayList<ServiceExt>(rp.getCount());
-				for (ServiceExt s : ResultPageHelper.toForeach(rp)) {
+				services = new ArrayList<ServiceInstance>(rp.getCount());
+				for (ServiceInstance s : ResultPageHelper.toForeach(rp)) {
 					services.add(s);
 				}
 				break;
@@ -195,7 +192,7 @@ public class DistributeManageImpl
 	}
 
 	@Override
-	public void syncFromBrother(List<GatewayNode> nodes, List<ServiceExt> regServices, List<ServiceExt> unregServices) {
+	public void syncFromBrother(List<GatewayNode> nodes, List<ServiceInstance> regServices, List<ServiceInstance> unregServices) {
 		// 同步微服务
 		try {
 			m_Gateway.syncServices(regServices, unregServices, false);
@@ -212,6 +209,11 @@ public class DistributeManageImpl
 	 * @param nodes
 	 */
 	protected void updateBrothers(List<GatewayNode> nodes) {
+		/*
+		 * 更新策略：
+		 * 若节点是配置的，则无法修改；
+		 * 若节点是同步而来，则允许该节点修改自身信息
+		 */
 		if (null == nodes || 0 == nodes.size()) {
 			return;
 		}
@@ -228,6 +230,7 @@ public class DistributeManageImpl
 			if (null != agent && agent.equals(node)) {
 				if (0 == i) {
 					// 第一个是发起此次同步的兄弟
+					agent.update(node);
 					agent.success();
 				}
 				// 没有变化
@@ -252,6 +255,7 @@ public class DistributeManageImpl
 				if (null != exist && exist.equals(node)) {
 					if (0 == i) {
 						// 第一个是发起此次同步的兄弟
+						exist.update(node);
 						exist.success();
 					}
 					// 没有变化
@@ -309,8 +313,18 @@ public class DistributeManageImpl
 				return false;
 			}
 			GatewayNode other = (GatewayNode) obj;
-			return getId().equals(other.getId()) && getHostName().equals(other.getHostName())
-					&& (getPort() == other.getPort());
+			return getId().equals(other.getId());
+		}
+		
+		void update(GatewayNode other) {
+			if (m_Permanent) {
+				return;
+			}
+			if (!StringUtil.eq(m_Vo.hostName, other.getHostName()) || m_Vo.port != other.getPort()) {
+				m_Vo.hostName = other.getHostName();
+				m_Vo.port = other.getPort();
+				m_Invoker = null;
+			}
 		}
 
 		ServiceInvoker getInvoker() {
@@ -321,7 +335,7 @@ public class DistributeManageImpl
 					return null;
 				}
 				String preUrl = "http://" + getHostName() + ":" + getPort() + "/";
-				SingleServiceInvoker invoker = new SingleServiceInvoker(preUrl, ServiceName.DISTRIBUTED.name);
+				SingleServiceInvoker invoker = new SingleServiceInvoker(preUrl, ServiceName.DISTRIBUTED.name, null);
 				invoker.setConnectTimeout(3000);
 				invoker.setReadTimeout(5000);
 				if (Configure.getInstance().isCompatMode()) {
@@ -368,14 +382,14 @@ public class DistributeManageImpl
 			}
 		}
 
-		ResultPage<ServiceExt> getServices() {
+		ResultPage<ServiceInstance> getServices() {
 			ServiceInvoker invoker = getInvoker();
 			if (null == invoker) {
 				return ResultPageHelper.empty();
 			}
 			String method = "get_services";
-			PageDataMapper pageDataMapper = new PageDataMapper(ServiceExt.class, ServiceExtMapper.INSTANCE);
-			RemoteResultPage<ServiceExt> rp = new RemoteResultPage<>(pageDataMapper, invoker, method);
+			PageDataMapper pageDataMapper = new PageDataMapper(ServiceInstance.class, ServiceInstanceMapper.INSTANCE);
+			RemoteResultPage<ServiceInstance> rp = new RemoteResultPage<>(pageDataMapper, invoker, method);
 			return rp;
 		}
 
@@ -391,11 +405,11 @@ public class DistributeManageImpl
 				invokeObj.putParam("nodes", list);
 			}
 			if (null != regServices && !regServices.isEmpty()) {
-				DtList list = SimpleDtList.toDtList(regServices, regServices.size(), ServiceExtMapper.INSTANCE);
+				DtList list = SimpleDtList.toDtList(regServices, regServices.size(), ServiceInstanceMapper.INSTANCE);
 				invokeObj.putParam("reg_services", list);
 			}
 			if (null != unregServices && !unregServices.isEmpty()) {
-				DtList list = SimpleDtList.toDtList(unregServices, unregServices.size(), ServiceExtMapper.INSTANCE);
+				DtList list = SimpleDtList.toDtList(unregServices, unregServices.size(), ServiceInstanceMapper.INSTANCE);
 				invokeObj.putParam("unreg_services", list);
 			}
 			Response resp = invoker.invoke(invokeObj.toDtObject());
@@ -456,7 +470,7 @@ public class DistributeManageImpl
 		}
 
 		boolean isSame(GatewayNode other) {
-			if(getId().equals(other.getId())) {
+			if (getId().equals(other.getId())) {
 				return true;
 			}
 			return getHostName().equals(other.getHostName()) && (getPort() == other.getPort());
@@ -466,7 +480,7 @@ public class DistributeManageImpl
 	synchronized void startTask() {
 		Thread task = m_Task;
 		if (m_Interval > 0 && null == task || !task.isAlive()) {
-			task = new Thread(m_SelfNode.getId() + "-node") {
+			task = new Thread("distribute-node-" + m_SelfNode.getId()) {
 				@Override
 				public void run() {
 					_Logger.info(this + " running...");
@@ -612,7 +626,7 @@ public class DistributeManageImpl
 	}
 
 	@Override
-	public ResultPage<ServiceExt> getServices() {
+	public ResultPage<ServiceInstance> getServices() {
 		return m_Gateway.listService(null);
 	}
 

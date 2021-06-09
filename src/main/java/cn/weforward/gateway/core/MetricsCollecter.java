@@ -18,7 +18,7 @@ import org.slf4j.LoggerFactory;
 import cn.weforward.common.sys.ClockTick;
 import cn.weforward.common.sys.Memory;
 import cn.weforward.common.sys.VmStat;
-import cn.weforward.metrics.WeforwadMetrics;
+import cn.weforward.metrics.WeforwardMetrics;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
@@ -102,32 +102,32 @@ public class MetricsCollecter {
 
 		m_RpcCounter = new RpcCounter();
 
-		Tags tags = WeforwadMetrics.TagHelper.of(WeforwadMetrics.TagHelper.gatewayId(m_ServerId));
-		TimeGauge.builder(WeforwadMetrics.GATEWAY_START_TIME, this, TimeUnit.MILLISECONDS,
+		Tags tags = WeforwardMetrics.TagHelper.of(WeforwardMetrics.TagHelper.gatewayId(m_ServerId));
+		TimeGauge.builder(WeforwardMetrics.GATEWAY_START_TIME, this, TimeUnit.MILLISECONDS,
 				MetricsCollecter::getStartTime).tags(tags).register(register);
-		TimeGauge.builder(WeforwadMetrics.GATEWAY_UP_TIME, this, TimeUnit.MILLISECONDS, MetricsCollecter::getUpTime)
+		TimeGauge.builder(WeforwardMetrics.GATEWAY_UP_TIME, this, TimeUnit.MILLISECONDS, MetricsCollecter::getUpTime)
 				.tags(tags).register(register);
-		Gauge.builder(WeforwadMetrics.GATEWAY_MEMORY_MAX, this, MetricsCollecter::getMemoryMax).tags(tags)
+		Gauge.builder(WeforwardMetrics.GATEWAY_MEMORY_MAX, this, MetricsCollecter::getMemoryMax).tags(tags)
 				.strongReference(true).register(register);
-		Gauge.builder(WeforwadMetrics.GATEWAY_MEMORY_ALLOC, this, MetricsCollecter::getMemoryAlloc).tags(tags)
+		Gauge.builder(WeforwardMetrics.GATEWAY_MEMORY_ALLOC, this, MetricsCollecter::getMemoryAlloc).tags(tags)
 				.strongReference(true).register(register);
-		Gauge.builder(WeforwadMetrics.GATEWAY_MEMORY_USED, this, MetricsCollecter::getMemoryUsed).tags(tags)
+		Gauge.builder(WeforwardMetrics.GATEWAY_MEMORY_USED, this, MetricsCollecter::getMemoryUsed).tags(tags)
 				.strongReference(true).register(register);
-		Gauge.builder(WeforwadMetrics.GATEWAY_GC_FULL_COUNT, this, MetricsCollecter::getGcCount).tags(tags)
+		Gauge.builder(WeforwardMetrics.GATEWAY_GC_FULL_COUNT, this, MetricsCollecter::getGcCount).tags(tags)
 				.strongReference(true).register(register);
-		Gauge.builder(WeforwadMetrics.GATEWAY_GC_FULL_TIME, this, MetricsCollecter::getGcTime).tags(tags)
+		Gauge.builder(WeforwardMetrics.GATEWAY_GC_FULL_TIME, this, MetricsCollecter::getGcTime).tags(tags)
 				.strongReference(true).register(register);
-		Gauge.builder(WeforwadMetrics.GATEWAY_THREAD_COUNT, this, MetricsCollecter::getThreadCount).tags(tags)
+		Gauge.builder(WeforwardMetrics.GATEWAY_THREAD_COUNT, this, MetricsCollecter::getThreadCount).tags(tags)
 				.strongReference(true).register(register);
-		Gauge.builder(WeforwadMetrics.GATEWAY_CPU_USAGE_RATE, this, MetricsCollecter::getProcessCpuLoad).tags(tags)
+		Gauge.builder(WeforwardMetrics.GATEWAY_CPU_USAGE_RATE, this, MetricsCollecter::getProcessCpuLoad).tags(tags)
 				.strongReference(true).register(register);
-		Gauge.builder(WeforwadMetrics.GATEWAY_RPC_COUNT, this, MetricsCollecter::getRpcCount).tags(tags)
+		Gauge.builder(WeforwardMetrics.GATEWAY_RPC_COUNT, this, MetricsCollecter::getRpcCount).tags(tags)
 				.strongReference(true).register(register);
-		Gauge.builder(WeforwadMetrics.GATEWAY_RPC_CONCURRENT, this, MetricsCollecter::getRpcMaxConcurrent).tags(tags)
+		Gauge.builder(WeforwardMetrics.GATEWAY_RPC_CONCURRENT, this, MetricsCollecter::getRpcMaxConcurrent).tags(tags)
 				.strongReference(true).register(register);
-		Gauge.builder(WeforwadMetrics.GATEWAY_STREAM_COUNT, this, MetricsCollecter::getStreamCount).tags(tags)
+		Gauge.builder(WeforwardMetrics.GATEWAY_STREAM_COUNT, this, MetricsCollecter::getStreamCount).tags(tags)
 				.strongReference(true).register(register);
-		Gauge.builder(WeforwadMetrics.GATEWAY_STREAM_CONCURRENT, this, MetricsCollecter::getStreamMaxConcurrent)
+		Gauge.builder(WeforwardMetrics.GATEWAY_STREAM_CONCURRENT, this, MetricsCollecter::getStreamMaxConcurrent)
 				.tags(tags).strongReference(true).register(register);
 	}
 

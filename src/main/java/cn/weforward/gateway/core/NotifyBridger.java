@@ -30,6 +30,7 @@ import cn.weforward.gateway.Tunnel;
 import cn.weforward.gateway.exception.BalanceException;
 import cn.weforward.gateway.util.CloseUtil;
 import cn.weforward.gateway.util.DiscardOutputStream;
+import cn.weforward.protocol.Header;
 import cn.weforward.protocol.Request;
 import cn.weforward.protocol.Service;
 import cn.weforward.protocol.exception.WeforwardException;
@@ -43,13 +44,13 @@ import cn.weforward.protocol.exception.WeforwardException;
 class NotifyBridger {
 	static final Logger _Logger = LoggerFactory.getLogger(NotifyBridger.class);
 
-	final ServiceEndpointBalance m_Balance;
+	final ServiceInstanceBalance m_Balance;
 	final NotifyTunnel m_TunnelWrap;
 	final PipeWrap m_PipeWrap;
 	volatile InputStream m_RequestBuffer;
 	volatile boolean m_RequestBufferReady;
 
-	NotifyBridger(ServiceEndpointBalance balance, Tunnel tunnel) throws IOException {
+	NotifyBridger(ServiceInstanceBalance balance, Tunnel tunnel) throws IOException {
 		m_RequestBuffer = tunnel.mirrorTransferStream();
 
 		m_Balance = balance;
@@ -98,10 +99,6 @@ class NotifyBridger {
 
 		NotifyTunnel(Tunnel tunnel) {
 			super(tunnel);
-		}
-
-		Tunnel getTunnel() {
-			return m_Tunnel;
 		}
 
 		// String getServiceName() {
@@ -163,7 +160,7 @@ class NotifyBridger {
 				ep = m_Balance.get(null, getVersion(), m_Connected);
 			} catch (BalanceException e) {
 				_Logger.warn(e.toString());
-				responseError(WeforwardException.CODE_SERVICE_INVOKE_ERROR, "通知失败，已尝试：" + m_Connected);
+				responseError(WeforwardException.CODE_SERVICE_INVOKE_ERROR, "单播失败，已尝试：" + m_Connected);
 				return;
 			}
 			m_Connected.add(ep.getService().getNo());
@@ -226,7 +223,7 @@ class NotifyBridger {
 
 		@Override
 		public void responseError(Pipe pipe, int code, String msg) {
-			_Logger.warn("微服务[" + ServiceInstance.getNameNo(pipe.getService()) + "]通知失败：" + code + "/" + msg);
+			_Logger.warn("微服务[" + ServiceInstance.getNameNo(pipe.getService()) + "]单播失败：" + code + "/" + msg);
 
 			if (m_CurrPipe == pipe) {
 				// 下一个
@@ -277,9 +274,9 @@ class NotifyBridger {
 				return;
 			}
 
-			// 通知成功 :)
+			// 单播成功 :)
 			if (_Logger.isTraceEnabled()) {
-				_Logger.trace("微服务[" + ServiceInstance.getNameNo(pipe.getService()) + "]通知成功");
+				_Logger.trace("微服务[" + ServiceInstance.getNameNo(pipe.getService()) + "]单播成功");
 			}
 
 			end();
@@ -296,7 +293,7 @@ class NotifyBridger {
 		@Override
 		public void responseCompleted(Pipe pipe) {
 			if (_Logger.isTraceEnabled()) {
-				_Logger.trace("微服务[" + ServiceInstance.getNameNo(pipe.getService()) + "]通知收到响应");
+				_Logger.trace("微服务[" + ServiceInstance.getNameNo(pipe.getService()) + "]收到单播响应");
 			}
 		}
 
@@ -307,7 +304,7 @@ class NotifyBridger {
 		List<Pipe> m_Pipes;
 		List<PipeReady> m_PipeReadys;
 		List<String> m_Successes;
-		AtomicInteger m_Dones;
+		AtomicInteger m_Count;
 
 		BroadCastTunnel(Tunnel tunnel) {
 			super(tunnel);
@@ -315,17 +312,18 @@ class NotifyBridger {
 			m_Pipes = new ArrayList<>();
 			m_PipeReadys = new ArrayList<>();
 			m_Successes = new ArrayList<>();
-			m_Dones = new AtomicInteger();
+			m_Count = new AtomicInteger();
 		}
 
 		@Override
 		void doNotify() {
 			List<ServiceEndpoint> eps = m_Balance.list();
 			if (ListUtil.isEmpty(eps)) {
-				responseError(WeforwardException.CODE_SERVICE_INVOKE_ERROR, "通知失败，无可用实例");
+				responseError(WeforwardException.CODE_SERVICE_INVOKE_ERROR, "广播失败，无可用实例");
 				return;
 			}
 
+			m_Count.set(eps.size());
 			for (ServiceEndpoint ep : eps) {
 				Pipe p = ep.connect(m_TunnelWrap, false);
 				m_Pipes.add(p);
@@ -374,7 +372,7 @@ class NotifyBridger {
 			synchronized (m_Successes) {
 				m_Successes.add(pipe.getService().getNo());
 			}
-			m_Dones.incrementAndGet();
+			m_Count.decrementAndGet();
 
 			checkFinish();
 		}
@@ -386,22 +384,24 @@ class NotifyBridger {
 					return;
 				}
 			}
-			m_Dones.incrementAndGet();
+			m_Count.decrementAndGet();
 
 			checkFinish();
 		}
 
 		void checkFinish() {
-			if (m_Dones.get() != m_Pipes.size()) {
+			if (0 != m_Count.get()) {
 				return;
 			}
 			if (0 == m_Successes.size()) {
 				// 全失败
-				m_Pipes = null;
-				responseError(WeforwardException.CODE_SERVICE_INVOKE_ERROR, "通知失败，全失败");
+				responseError(WeforwardException.CODE_SERVICE_INVOKE_ERROR, "广播失败，全失败");
 				return;
 			}
 
+			if (_Logger.isTraceEnabled()) {
+				_Logger.trace("微服务[" + m_Tunnel.getHeader().getService() + "]广播完成，成功：" + m_Successes);
+			}
 			end();
 			m_PipeWrap.setNotifyReceives(m_Successes);
 			m_Tunnel.responseReady(m_PipeWrap);
@@ -421,7 +421,7 @@ class NotifyBridger {
 					BytesOutputStream.transfer(in, pr.output, 0);
 					pr.pipe.requestCompleted(this);
 				} catch (Throwable e) {
-					_Logger.error("微服务[" + ServiceInstance.getNameNo(pr.pipe.getService()) + "]通知失败", e);
+					_Logger.error("微服务[" + ServiceInstance.getNameNo(pr.pipe.getService()) + "]广播失败", e);
 					pr.pipe.requestCanceled(this);
 				} finally {
 					CloseUtil.close(in, _Logger);
@@ -441,7 +441,7 @@ class NotifyBridger {
 
 		@Override
 		public void responseError(Pipe pipe, int code, String msg) {
-			_Logger.warn("微服务[" + ServiceInstance.getNameNo(pipe.getService()) + "]通知失败：" + code + "/" + msg);
+			_Logger.warn("微服务[" + ServiceInstance.getNameNo(pipe.getService()) + "]广播失败：" + code + "/" + msg);
 
 			addFail(pipe);
 		}
@@ -464,9 +464,9 @@ class NotifyBridger {
 
 		@Override
 		public void requestCompleted(Pipe pipe) {
-			// 通知成功 :)
-			if (_Logger.isInfoEnabled()) {
-				_Logger.info("微服务[" + ServiceInstance.getNameNo(pipe.getService()) + "]通知成功");
+			// 广播成功 :)
+			if (_Logger.isTraceEnabled()) {
+				_Logger.trace("微服务[" + ServiceInstance.getNameNo(pipe.getService()) + "]广播成功");
 			}
 
 			addSuccess(pipe);
@@ -480,7 +480,7 @@ class NotifyBridger {
 		@Override
 		public void responseCompleted(Pipe pipe) {
 			if (_Logger.isTraceEnabled()) {
-				_Logger.trace("微服务[" + ServiceInstance.getNameNo(pipe.getService()) + "]通知收到响应");
+				_Logger.trace("微服务[" + ServiceInstance.getNameNo(pipe.getService()) + "]广播收到响应");
 			}
 		}
 
@@ -499,6 +499,11 @@ class NotifyBridger {
 	private class PipeWrap implements Pipe {
 
 		List<String> m_NotifyReceives;
+		
+		@Override
+		public Header getHeader() {
+			return null;
+		}
 
 		@Override
 		public String getTag() {

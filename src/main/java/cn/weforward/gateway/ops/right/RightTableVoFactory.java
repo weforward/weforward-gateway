@@ -10,8 +10,8 @@
  */
 package cn.weforward.gateway.ops.right;
 
-import cn.weforward.common.ResultPage;
 import cn.weforward.gateway.Pluginable;
+import cn.weforward.gateway.ops.VoFactory;
 
 /**
  * <code>RightTableVo</code>工厂
@@ -19,56 +19,6 @@ import cn.weforward.gateway.Pluginable;
  * @author zhangpengji
  *
  */
-public interface RightTableVoFactory extends Pluginable {
+public interface RightTableVoFactory extends VoFactory<RightTableVo>, Pluginable {
 
-	// /**
-	// * 生成新ID并加上指定前缀
-	// *
-	// * @param prefix
-	// * @return
-	// */
-	// String genPersistenceId(String prefix);
-
-	/**
-	 * 按id获取RightTableVo
-	 * 
-	 * @param id
-	 * @return
-	 */
-	RightTableVo get(String id);
-
-	/**
-	 * 置入一个RightTableDo
-	 * 
-	 * @param rightTableVo
-	 */
-	void put(RightTableVo rightTableVo);
-
-	/**
-	 * 按id前缀搜索
-	 * 
-	 * @param prefix
-	 * @return
-	 */
-	ResultPage<RightTableVo> startsWith(String prefix);
-
-	/**
-	 * 注册重载监听器
-	 *
-	 * @param listener
-	 */
-	void registerReloadListener(ReloadListener listener);
-
-	/**
-	 * 注销重载监听器
-	 *
-	 * @param listener
-	 * @return 注销成功返回true
-	 */
-	boolean unregisterReloadListener(ReloadListener listener);
-
-	interface ReloadListener {
-
-		void onReload(RightTableVo rightTableVo);
-	}
 }

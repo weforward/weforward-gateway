@@ -11,7 +11,6 @@
 package cn.weforward.gateway.ops.right;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import cn.weforward.common.util.ListUtil;
@@ -52,7 +51,7 @@ public class InternalRightTable extends AbstractTable {
 		m_ImmutableItems.add(vo);
 	}
 
-	RightTable getVariableTable() {
+	RightTable openVariableTable() {
 		if (null == m_VariableTable) {
 			synchronized (this) {
 				if (null == m_VariableTable) {
@@ -66,16 +65,16 @@ public class InternalRightTable extends AbstractTable {
 	@SuppressWarnings("unchecked")
 	@Override
 	protected List<RightTableItemVo> getItemVos() {
-		List<RightTableItemVo> variables = getVariableTable().getItemVos();
-		if (null == variables) {
-			variables = Collections.emptyList();
+		RightTable variable = openVariableTable();
+		if (null == variable) {
+			return m_ImmutableItems;
 		}
-		return ListUtil.union(m_ImmutableItems, variables);
+		return ListUtil.union(m_ImmutableItems, variable.getItemVos());
 	}
 
 	@Override
 	public void appendItem(RightTableItem item) {
-		getVariableTable().appendItem(item);
+		openVariableTable().appendItem(item);
 	}
 
 	@Override
@@ -84,7 +83,7 @@ public class InternalRightTable extends AbstractTable {
 			throw new OperationsException("内置项不可更改。index:" + index);
 		}
 		index -= m_ImmutableItems.size();
-		getVariableTable().insertItem(item, index);
+		openVariableTable().insertItem(item, index);
 	}
 
 	@Override
@@ -93,7 +92,7 @@ public class InternalRightTable extends AbstractTable {
 			throw new OperationsException("内置项不可更改。index:" + index);
 		}
 		index -= m_ImmutableItems.size();
-		getVariableTable().replaceItem(item, index, name);
+		openVariableTable().replaceItem(item, index, name);
 	}
 
 	@Override
@@ -103,7 +102,7 @@ public class InternalRightTable extends AbstractTable {
 		}
 		from -= m_ImmutableItems.size();
 		to -= m_ImmutableItems.size();
-		getVariableTable().moveItem(from, to);
+		openVariableTable().moveItem(from, to);
 	}
 
 	@Override
@@ -112,7 +111,12 @@ public class InternalRightTable extends AbstractTable {
 			throw new OperationsException("内置项不可更改。index:" + index);
 		}
 		index -= m_ImmutableItems.size();
-		getVariableTable().removeItem(index, name);
+		openVariableTable().removeItem(index, name);
+	}
+	
+	@Override
+	public void setItems(List<RightTableItem> items) {
+		openVariableTable().setItems(items);
 	}
 
 }

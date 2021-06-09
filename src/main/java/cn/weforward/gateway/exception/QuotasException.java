@@ -10,6 +10,8 @@
  */
 package cn.weforward.gateway.exception;
 
+import cn.weforward.common.NameItem;
+
 public class QuotasException extends BalanceException {
 	private static final long serialVersionUID = 1L;
 
@@ -17,12 +19,16 @@ public class QuotasException extends BalanceException {
 		super(serviceName, errMsg, keyword);
 	}
 
+	protected QuotasException(String serviceName, String errMsg, NameItem keyword) {
+		super(serviceName, errMsg, keyword);
+	}
+
 	public static QuotasException overQuotas(String serviceName, String errMsg) {
-		return new QuotasException(serviceName, errMsg, "超额");
+		return new QuotasException(serviceName, errMsg, CODE_OVER_QUOTAS);
 	}
 
 	public static QuotasException fullQuotas(String serviceName, String errMsg) {
-		return new QuotasException(serviceName, errMsg, "满额");
+		return new QuotasException(serviceName, errMsg, CODE_FULL_QUOTAS);
 	}
 
 }

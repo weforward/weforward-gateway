@@ -10,8 +10,8 @@
  */
 package cn.weforward.gateway.ops.access.system;
 
-import cn.weforward.common.ResultPage;
 import cn.weforward.gateway.Pluginable;
+import cn.weforward.gateway.ops.VoFactory;
 
 /**
  * <code>MasterKeyvVo</code>工厂
@@ -19,58 +19,6 @@ import cn.weforward.gateway.Pluginable;
  * @author zhangpengji
  *
  */
-public interface MasterKeyVoFactory extends Pluginable {
+public interface MasterKeyVoFactory extends VoFactory<MasterKeyVo>, Pluginable {
 
-	// /**
-	// * 生成新ID并加上指定前缀
-	// * <p>
-	// * 新ID不能包含Access的保留字符，如{@linkplain Access#SPEARATOR}
-	// *
-	// * @param prefix
-	// * @return
-	// */
-	// String genPersistenceId(String prefix);
-
-	/**
-	 * 按id获取MasterKeyVo
-	 * 
-	 * @param id
-	 * @return
-	 */
-	MasterKeyVo get(String id);
-
-	/**
-	 * 置入一个MasterKeyVo
-	 * 
-	 * @param masterKeyVo
-	 */
-	void put(MasterKeyVo masterKeyVo);
-
-	/**
-	 * 按id前缀搜索
-	 *
-	 * @param prefix
-	 * @return
-	 */
-	ResultPage<MasterKeyVo> startsWith(String prefix);
-
-	/**
-	 * 注册重载监听器
-	 *
-	 * @param listener
-	 */
-	void registerReloadListener(ReloadListener listener);
-
-	/**
-	 * 注销重载监听器
-	 *
-	 * @param listener
-	 * @return 注销成功返回true
-	 */
-	boolean unregisterReloadListener(ReloadListener listener);
-
-	interface ReloadListener {
-
-		void onReload(MasterKeyVo masterKeyVo);
-	}
 }

@@ -12,6 +12,7 @@ package cn.weforward.gateway.api;
 
 import cn.weforward.gateway.GatewayExt;
 import cn.weforward.gateway.distribute.DistributeManage;
+import cn.weforward.gateway.mesh.MeshManage;
 import cn.weforward.gateway.ops.access.AccessManage;
 import cn.weforward.gateway.ops.right.RightManage;
 import cn.weforward.gateway.ops.traffic.TrafficManage;
@@ -27,11 +28,13 @@ public class GatewayApis {
 	ServiceRegisterApi m_ServiceRegisterApi;
 	DistributeApi m_DistributeApi;
 	KeeperApi m_KeeperApi;
+	MeshApi m_MeshApi;
 
 	public GatewayApis() {
 		m_ServiceRegisterApi = new ServiceRegisterApi();
 		m_DistributeApi = new DistributeApi();
 		m_KeeperApi = new KeeperApi();
+		m_MeshApi = new MeshApi();
 	}
 
 	public void setAccessManage(AccessManage am) {
@@ -54,6 +57,10 @@ public class GatewayApis {
 	public void setDistributeManage(DistributeManage dm) {
 		m_DistributeApi.setDistributeManage(dm);
 	}
+	
+	public void setMeshManage(MeshManage mm) {
+		m_MeshApi.setMeshManage(mm);
+	}
 
 	/**
 	 * 按名称获取网关Api
@@ -70,6 +77,9 @@ public class GatewayApis {
 		}
 		if (m_KeeperApi.getName().equals(name)) {
 			return m_KeeperApi;
+		}
+		if(m_MeshApi.getName().equals(name)) {
+			return m_MeshApi;
 		}
 		return null;
 	}

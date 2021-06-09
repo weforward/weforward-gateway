@@ -11,7 +11,6 @@
 package cn.weforward.gateway.plugin.mongodb.di;
 
 import cn.weforward.data.persister.BusinessDi;
-import cn.weforward.gateway.plugin.mongodb.ServiceAccess;
 
 /**
  * SystemAccess依赖接口
@@ -21,5 +20,4 @@ import cn.weforward.gateway.plugin.mongodb.ServiceAccess;
  */
 public interface ServiceAccessDi extends BusinessDi {
 
-	void onReload(ServiceAccess obj);
 }

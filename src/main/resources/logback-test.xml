@@ -22,7 +22,9 @@
 	<!-- <logger name="cn.weforward.gateway.core.ServiceEndpoint" level="TRACE" />  -->
 	<logger name="cn.weforward.gateway.core.GatewayExt" level="TRACE" />
 	<logger name="cn.weforward.gateway.distribute.DistributeManageImpl" level="TRACE" />
+	<logger name="cn.weforward.gateway.mesh.MeshManage" level="TRACE" />
 	<logger name="cn.weforward.gateway.core.EventBridger" level="TRACE" />
+	<logger name="cn.weforward.gateway.ops" level="TRACE" />
 
 	<root>
 		<level value="INFO" />

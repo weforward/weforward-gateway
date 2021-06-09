@@ -36,6 +36,7 @@ import cn.weforward.gateway.Tunnel;
 import cn.weforward.gateway.exception.DebugServiceException;
 import cn.weforward.gateway.ops.trace.ServiceTracer;
 import cn.weforward.gateway.util.SyncTunnel;
+import cn.weforward.metrics.WeforwardMetrics;
 import cn.weforward.protocol.Access;
 import cn.weforward.protocol.Request;
 import cn.weforward.protocol.RequestConstants;
@@ -48,6 +49,9 @@ import cn.weforward.protocol.ops.traffic.TrafficTableItem;
 import cn.weforward.protocol.support.datatype.FriendlyObject;
 import cn.weforward.protocol.support.datatype.SimpleDtObject;
 import cn.weforward.protocol.support.doc.ServiceDocumentVo;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tags;
 
 /**
  * 微服务实例端点
@@ -58,14 +62,14 @@ import cn.weforward.protocol.support.doc.ServiceDocumentVo;
 public abstract class ServiceEndpoint extends BalanceElement {
 	protected final static Logger _Logger = LoggerFactory.getLogger(ServiceEndpoint.class);
 
-	protected ServiceEndpointBalance m_Balance;
+	protected ServiceInstanceBalance m_Balance;
 	protected ServiceInstance m_Service;
 	/** 连接超时，秒 */
 	protected int m_ConnectTimeout;
 	/** 读取超时，秒 */
 	protected int m_ReadTimeout;
 
-	protected ServiceEndpoint(ServiceEndpointBalance balance, ServiceInstance service, TrafficTableItem rule) {
+	protected ServiceEndpoint(ServiceInstanceBalance balance, ServiceInstance service, TrafficTableItem rule) {
 		super(rule.getWeight());
 		setMaxFails(rule.getMaxFails());
 		setFailTimeout(rule.getFailTimeout() * 1000);
@@ -76,7 +80,7 @@ public abstract class ServiceEndpoint extends BalanceElement {
 		m_ReadTimeout = rule.getReadTimeout();
 	}
 
-	public static ServiceEndpoint openEndpoint(ServiceEndpointBalance group, ServiceInstance service,
+	public static ServiceEndpoint openEndpoint(ServiceInstanceBalance group, ServiceInstance service,
 			TrafficTableItem rule) {
 		if (ListUtil.isEmpty(service.getUrls())) {
 			return null;
@@ -86,6 +90,18 @@ public abstract class ServiceEndpoint extends BalanceElement {
 		} else {
 			return new HttpServiceEndpoint(group, service, rule);
 		}
+	}
+
+	void startGauge(String gatewayId, MeterRegistry registry) {
+		Tags tags = WeforwardMetrics.TagHelper.of(WeforwardMetrics.TagHelper.gatewayId(gatewayId),
+				WeforwardMetrics.TagHelper.serviceName(getName()),
+				WeforwardMetrics.TagHelper.serviceNo(m_Service.getNo()));
+		Gauge.builder(WeforwardMetrics.GATEWAY_SERVICE_RPC_COUNT, this, ServiceEndpoint::getTimes).tags(tags)
+				.register(registry);
+		Gauge.builder(WeforwardMetrics.GATEWAY_SERVICE_RPC_CONCURRENT, this, ServiceEndpoint::getConcurrent)
+				.tags(tags).register(registry);
+		Gauge.builder(WeforwardMetrics.GATEWAY_SERVICE_RPC_FAIL, this, ServiceEndpoint::getFailTotal).tags(tags)
+				.register(registry);
 	}
 
 	public String getId() {
@@ -174,6 +190,10 @@ public abstract class ServiceEndpoint extends BalanceElement {
 		if (s1.isHoninyunMode() != s2.isHoninyunMode()) {
 			return false;
 		}
+		// 若所在网格变了，编号、链接应该都变了，故省略以下判断
+		// if(!StringUtil.eq(s1.getMeshNodeId(), s2.getMeshNodeId())) {
+		// return false;
+		// }
 		return true;
 	}
 
@@ -209,6 +229,10 @@ public abstract class ServiceEndpoint extends BalanceElement {
 		}
 		return nos.contains(m_Service.getNo());
 	}
+	
+	boolean isSelfMesh() {
+		return m_Service.isSelfMesh();
+	}
 
 	/**
 	 * 与微服务端建立连接
@@ -218,12 +242,15 @@ public abstract class ServiceEndpoint extends BalanceElement {
 	 *            是否支持转发
 	 */
 	public Pipe connect(Tunnel tunnel, boolean supportForward) {
+		return openPipe(tunnel, supportForward);
+	}
+	
+	protected ServiceTraceToken createTraceToken(Tunnel tunnel) {
 		ServiceTracer tracer = m_Balance.getServiceTracer();
-		ServiceTraceToken token = tracer.onBegin(tunnel.getTraceToken(), getService());
-		return openPipe(tunnel, token, supportForward);
+		return tracer.onBegin(tunnel.getTraceToken(), getService());
 	}
 
-	protected abstract Pipe openPipe(Tunnel tunnel, ServiceTraceToken token, boolean supportForward);
+	protected abstract Pipe openPipe(Tunnel tunnel, boolean supportForward);
 
 	/**
 	 * 与微服务端建立连接
@@ -303,7 +330,7 @@ public abstract class ServiceEndpoint extends BalanceElement {
 		invokeObject.put(RequestConstants.METHOD, method);
 		SyncTunnel tunnel = new SyncTunnel(name, invokeObject);
 		tunnel.setAccess(getInternalAccess());
-		tunnel.setWaitTimeout(10 * 1000);
+		tunnel.setWaitTimeout(10);
 		connect(tunnel, false);
 
 		FriendlyObject result;

@@ -13,7 +13,7 @@ package cn.weforward.gateway.distribute;
 import java.util.List;
 
 import cn.weforward.common.ResultPage;
-import cn.weforward.protocol.ops.ServiceExt;
+import cn.weforward.gateway.ServiceInstance;
 
 /**
  * 网关分布管理
@@ -34,12 +34,12 @@ public interface DistributeManage {
 	 *            从兄弟节点注销的微服务
 	 * @return
 	 */
-	void syncFromBrother(List<GatewayNode> nodes, List<ServiceExt> regServices, List<ServiceExt> unregServices);
+	void syncFromBrother(List<GatewayNode> nodes, List<ServiceInstance> regServices, List<ServiceInstance> unregServices);
 
 	/**
 	 * 获取本节点的全部微服务
 	 * 
 	 * @return
 	 */
-	ResultPage<ServiceExt> getServices();
+	ResultPage<ServiceInstance> getServices();
 }

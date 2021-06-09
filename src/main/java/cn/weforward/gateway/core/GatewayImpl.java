@@ -22,6 +22,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
 import cn.weforward.common.GcCleanable;
+import cn.weforward.common.NameItem;
 import cn.weforward.common.ResultPage;
 import cn.weforward.common.sys.GcCleaner;
 import cn.weforward.common.util.LruCache;
@@ -31,6 +32,7 @@ import cn.weforward.common.util.TaskExecutor;
 import cn.weforward.common.util.TaskExecutor.Task;
 import cn.weforward.gateway.Configure;
 import cn.weforward.gateway.GatewayExt;
+import cn.weforward.gateway.MeshNode;
 import cn.weforward.gateway.PluginContainer;
 import cn.weforward.gateway.PluginListener;
 import cn.weforward.gateway.Pluginable;
@@ -46,7 +48,8 @@ import cn.weforward.gateway.ops.trace.ServiceTracer;
 import cn.weforward.gateway.ops.traffic.TrafficListener;
 import cn.weforward.gateway.ops.traffic.TrafficManage;
 import cn.weforward.gateway.util.ServiceNameMatcher;
-import cn.weforward.metrics.WeforwadMetrics;
+import cn.weforward.metrics.WeforwardMetrics;
+import cn.weforward.protocol.Header;
 import cn.weforward.protocol.Service;
 import cn.weforward.protocol.aio.netty.NettyHttpClientFactory;
 import cn.weforward.protocol.datatype.DtObject;
@@ -55,7 +58,7 @@ import cn.weforward.protocol.exception.AuthException;
 import cn.weforward.protocol.exception.WeforwardException;
 import cn.weforward.protocol.ext.Producer;
 import cn.weforward.protocol.ext.ServiceRuntime;
-import cn.weforward.protocol.ops.ServiceExt;
+import cn.weforward.protocol.gateway.ServiceSummary;
 import cn.weforward.protocol.ops.trace.ServiceTraceToken;
 import cn.weforward.protocol.ops.traffic.TrafficTable;
 import io.micrometer.core.instrument.Gauge;
@@ -71,6 +74,8 @@ import io.micrometer.core.instrument.TimeGauge;
  */
 public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener, GcCleanable {
 
+	protected final String m_ServerId;
+
 	protected AccessManage m_AccessManage;
 	protected TrafficManage m_TrafficManage;
 	protected RightManage m_RightManage;
@@ -85,7 +90,7 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 	private Map<String, ServiceInstance> m_Services = new ConcurrentHashMap<>();
 
 	// 按名称分组合并后的服务集合
-	private Map<String, ServiceEndpointBalance> m_ServiceBalances = new ConcurrentHashMap<>();
+	private Map<String, ServiceInstanceBalance> m_ServiceBalances = new ConcurrentHashMap<>();
 	// 微服务配额
 	private ServiceQuotas m_ServiceQuotas;
 	// 允许服务心跳连续缺失的次数
@@ -101,7 +106,10 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 	// 清理任务
 	private Task m_ClearTask;
 
-	public GatewayImpl() {
+	public GatewayImpl(String serverId, MeterRegistry meterRegistry) {
+		m_ServerId = serverId;
+		m_MeterRegistry = meterRegistry;
+
 		m_ServiceListeners = new CopyOnWriteArrayList<>();
 
 		m_ServiceDocCache = new LruCache<>(1000, "service_doc");
@@ -155,6 +163,10 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 
 	public void setRightManage(RightManage rm) {
 		m_RightManage = rm;
+	}
+
+	public void setAclManage(AclManage am) {
+		m_AclManage = am;
 	}
 
 	public void setServiceTracer(ServiceTracer tracer) {
@@ -235,8 +247,21 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 		// tunnel.responseError(null, WeforwardException.CODE_UNREADY, "网关未就绪");
 		// return;
 		// }
-		String serviceName = tunnel.getHeader().getService();
-		ServiceEndpointBalance balance = m_ServiceBalances.get(serviceName);
+		// 网格中继
+		if(tunnel.isFromMeshForward()) {
+			jointMesh(tunnel);
+			return;
+		}
+		
+		// topic信道
+		Header header = tunnel.getHeader();
+		if (Header.CHANNEL_TOPIC.equals(header.getChannel())) {
+			jointTopic(tunnel);
+			return;
+		}
+		
+		String serviceName = header.getService();
+		ServiceInstanceBalance balance = m_ServiceBalances.get(serviceName);
 		if (null == balance) {
 			tunnel.responseError(null, WeforwardException.CODE_SERVICE_NOT_FOUND, "服务不存在：" + serviceName);
 			return;
@@ -248,6 +273,7 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 			tunnel.responseError(null, e.getCode(), e.getMessage());
 			return;
 		}
+		
 		int depth = ServiceTraceToken.Helper.getDepth(tunnel.getTraceToken());
 		int maxDepth = Configure.getInstance().getServiceInvokeMaxDepth();
 		if (depth > maxDepth) {
@@ -257,6 +283,28 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 		balance.joint(tunnel);
 	}
 
+	private void jointTopic(Tunnel tunnel) {
+		TopicBridger bridger = new TopicBridger();
+		try {
+			bridger.jonit(this, tunnel);
+		} catch (Throwable e) {
+			_Logger.error(e.toString(), e);
+			tunnel.responseError(null, WeforwardException.CODE_INTERNAL_ERROR, "内部错误");
+			return;
+		}
+		bridger.connect();
+	}
+	
+	private void jointMesh(Tunnel tunnel) {
+		String serviceName = tunnel.getHeader().getService();
+		ServiceInstanceBalance balance = m_ServiceBalances.get(serviceName);
+		if (null == balance) {
+			tunnel.responseError(null, WeforwardException.CODE_SERVICE_NOT_FOUND, "服务不存在：" + serviceName);
+			return;
+		}
+		balance.jointByMesh(tunnel);
+	}
+
 	@Override
 	public void joint(StreamTunnel tunnel) {
 		// if (!isReady()) {
@@ -264,12 +312,12 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 		// return;
 		// }
 		String serviceName = tunnel.getServiceName();
-		ServiceEndpointBalance service = m_ServiceBalances.get(serviceName);
-		if (null == service) {
+		ServiceInstanceBalance balance = m_ServiceBalances.get(serviceName);
+		if (null == balance) {
 			tunnel.responseError(null, StreamTunnel.CODE_NOT_FOUND, "服务不存在：" + serviceName);
 			return;
 		}
-		service.joint(tunnel);
+		balance.joint(tunnel);
 	}
 
 	@Override
@@ -290,26 +338,26 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 			return;
 		}
 		try {
-			Tags tags = WeforwadMetrics.TagHelper.of(WeforwadMetrics.ONE_METRICS_TAG,
-					WeforwadMetrics.TagHelper.serviceName(service.getName()),
-					WeforwadMetrics.TagHelper.serviceNo(service.getNo()));
-			Gauge.builder(WeforwadMetrics.MEMORY_MAX, runtime, ServiceRuntime::getMemoryMax).tags(tags)
+			Tags tags = WeforwardMetrics.TagHelper.of(WeforwardMetrics.ONE_METRICS_TAG,
+					WeforwardMetrics.TagHelper.serviceName(service.getName()),
+					WeforwardMetrics.TagHelper.serviceNo(service.getNo()));
+			Gauge.builder(WeforwardMetrics.MEMORY_MAX, runtime, ServiceRuntime::getMemoryMax).tags(tags)
 					.strongReference(true).register(registry);
-			Gauge.builder(WeforwadMetrics.MEMORY_ALLOC, runtime, ServiceRuntime::getMemoryAlloc).tags(tags)
+			Gauge.builder(WeforwardMetrics.MEMORY_ALLOC, runtime, ServiceRuntime::getMemoryAlloc).tags(tags)
 					.strongReference(true).register(registry);
-			Gauge.builder(WeforwadMetrics.MEMORY_USED, runtime, ServiceRuntime::getMemoryUsed).tags(tags)
+			Gauge.builder(WeforwardMetrics.MEMORY_USED, runtime, ServiceRuntime::getMemoryUsed).tags(tags)
 					.strongReference(true).register(registry);
-			Gauge.builder(WeforwadMetrics.GC_FULL_COUNT, runtime, ServiceRuntime::getGcFullCount).tags(tags)
+			Gauge.builder(WeforwardMetrics.GC_FULL_COUNT, runtime, ServiceRuntime::getGcFullCount).tags(tags)
 					.strongReference(true).register(registry);
-			Gauge.builder(WeforwadMetrics.GC_FULL_TIME, runtime, ServiceRuntime::getGcFullTime).tags(tags)
+			Gauge.builder(WeforwardMetrics.GC_FULL_TIME, runtime, ServiceRuntime::getGcFullTime).tags(tags)
 					.strongReference(true).register(registry);
-			Gauge.builder(WeforwadMetrics.THREAD_COUNT, runtime, ServiceRuntime::getThreadCount).tags(tags)
+			Gauge.builder(WeforwardMetrics.THREAD_COUNT, runtime, ServiceRuntime::getThreadCount).tags(tags)
 					.strongReference(true).register(registry);
-			Gauge.builder(WeforwadMetrics.CPU_USAGE_RATE, runtime, ServiceRuntime::getCpuUsageRate).tags(tags)
+			Gauge.builder(WeforwardMetrics.CPU_USAGE_RATE, runtime, ServiceRuntime::getCpuUsageRate).tags(tags)
 					.strongReference(true).register(registry);
-			TimeGauge.builder(WeforwadMetrics.START_TIME, runtime, TimeUnit.MILLISECONDS, ServiceRuntime::getStartTime)
+			TimeGauge.builder(WeforwardMetrics.START_TIME, runtime, TimeUnit.MILLISECONDS, ServiceRuntime::getStartTime)
 					.tags(tags).register(registry);
-			TimeGauge.builder(WeforwadMetrics.UP_TIME, runtime, TimeUnit.MILLISECONDS, ServiceRuntime::getUpTime)
+			TimeGauge.builder(WeforwardMetrics.UP_TIME, runtime, TimeUnit.MILLISECONDS, ServiceRuntime::getUpTime)
 					.tags(tags).register(registry);
 		} catch (Throwable e) {
 			_Logger.error(e.toString(), e);
@@ -324,10 +372,10 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 		m_Services.put(service.getId(), service);
 
 		String name = service.getName();
-		ServiceEndpointBalance balance = m_ServiceBalances.get(name);
+		ServiceInstanceBalance balance = m_ServiceBalances.get(name);
 		if (null == balance) {
 			// 并发时只会保留最后一个，重新注册一遍就行，不做同步
-			balance = new ServiceEndpointBalance(this, name);
+			balance = new ServiceInstanceBalance(this, name);
 			m_ServiceBalances.put(name, balance);
 		}
 		balance.put(service);
@@ -368,7 +416,7 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 	private void timeoutService(ServiceInstance service) {
 		_Logger.error("微服务[" + service.toStringNameNo() + "]心跳超时");
 
-		ServiceEndpointBalance balance = m_ServiceBalances.get(service.getName());
+		ServiceInstanceBalance balance = m_ServiceBalances.get(service.getName());
 		if (null != balance) {
 			balance.timeout(service);
 		}
@@ -379,10 +427,10 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 	private void removeService(ServiceInstance service) {
 		m_Services.remove(service.getId());
 
-		ServiceEndpointBalance balance = m_ServiceBalances.get(service.getName());
+		ServiceInstanceBalance balance = m_ServiceBalances.get(service.getName());
 		if (null != balance) {
 			balance.remove(service);
-			if(0 == balance.getEndpointCount()) {
+			if (0 == balance.getEndpointCount()) {
 				// 与注册并发时，可能抢先移除，重新注册一遍就行，不做同步
 				m_ServiceBalances.remove(service.getName());
 			}
@@ -390,13 +438,13 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 	}
 
 	@Override
-	public void syncServices(List<ServiceExt> reg, List<ServiceExt> unreg, boolean complete) {
+	public void syncServices(List<ServiceInstance> reg, List<ServiceInstance> unreg, boolean complete) {
 		if (_Logger.isTraceEnabled()) {
 			_Logger.trace(
 					"同步微服务：reg=" + (null == reg ? 0 : reg.size()) + ",unreg=" + (null == unreg ? 0 : unreg.size()));
 		}
 		if (null != reg && reg.size() > 0) {
-			for (ServiceExt s : reg) {
+			for (ServiceInstance s : reg) {
 				if (null == s) {
 					continue;
 				}
@@ -404,7 +452,7 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 			}
 		}
 		if (null != unreg && unreg.size() > 0) {
-			for (ServiceExt s : unreg) {
+			for (ServiceInstance s : unreg) {
 				if (null == s) {
 					continue;
 				}
@@ -414,6 +462,32 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 
 		if (complete) {
 			m_Ready = true;
+		}
+	}
+	
+	@Override
+	public void syncServices(MeshNode meshNode, List<ServiceInstance> reg, List<ServiceInstance> unreg) {
+		if (_Logger.isTraceEnabled()) {
+			_Logger.trace("同步Mesh[" + meshNode.getId() + "]微服务：reg=" + (null == reg ? 0 : reg.size()) + ",unreg="
+					+ (null == unreg ? 0 : unreg.size()));
+		}
+		if (null != reg && reg.size() > 0) {
+			for (ServiceInstance s : reg) {
+				if (null == s) {
+					continue;
+				}
+				ServiceInstance si = new ServiceInstance(s);
+				si.setMeshNode(meshNode);
+				registerServiceInner(si, false);
+			}
+		}
+		if (null != unreg && unreg.size() > 0) {
+			for (ServiceInstance s : unreg) {
+				if (null == s) {
+					continue;
+				}
+				unregisterServiceInner(s.getOwner(), s, false);
+			}
 		}
 	}
 
@@ -449,8 +523,8 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 	}
 
 	@Override
-	public ResultPage<ServiceExt> listService(String name) {
-		List<ServiceExt> list = new ArrayList<>();
+	public ResultPage<ServiceInstance> listService(String name) {
+		List<ServiceInstance> list = new ArrayList<>();
 		if (StringUtil.isEmpty(name)) {
 			name = null;
 		}
@@ -465,10 +539,19 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 		}
 		return ResultPageHelper.toResultPage(list);
 	}
+	
+	@Override
+	public List<ServiceInstance> listValidService(String name) {
+		ServiceInstanceBalance balance = m_ServiceBalances.get(name);
+		if(null == balance) {
+			return Collections.emptyList();
+		}
+		return balance.listServiceInstance();
+	}
 
 	@Override
-	public ResultPage<ServiceExt> searchService(String keyword, String runningId) {
-		List<ServiceExt> list = new ArrayList<>();
+	public ResultPage<ServiceInstance> searchService(String keyword, String runningId) {
+		List<ServiceInstance> list = new ArrayList<>();
 		keyword = StringUtil.isEmpty(keyword) ? null : keyword;
 		runningId = StringUtil.isEmpty(runningId) ? null : runningId;
 		for (ServiceInstance s : m_Services.values()) {
@@ -489,7 +572,7 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 	@Override
 	public void onTrafficRuleChange(TrafficTable table) {
 		String serviceName = table.getName();
-		ServiceEndpointBalance balance = m_ServiceBalances.get(serviceName);
+		ServiceInstanceBalance balance = m_ServiceBalances.get(serviceName);
 		if (null == balance) {
 			return;
 		}
@@ -505,7 +588,7 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 
 	@Override
 	public List<ServiceDocument> getDocuments(String serviceName) {
-		ServiceEndpointBalance balance = m_ServiceBalances.get(serviceName);
+		ServiceInstanceBalance balance = m_ServiceBalances.get(serviceName);
 		if (null == balance) {
 			return Collections.emptyList();
 		}
@@ -570,7 +653,7 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 		if (StringUtil.isEmpty(serviceName) || StringUtil.isEmpty(serviceNo)) {
 			throw new DebugServiceException("未指定微服务名与微服务编号");
 		}
-		ServiceEndpointBalance balance = m_ServiceBalances.get(serviceName);
+		ServiceInstanceBalance balance = m_ServiceBalances.get(serviceName);
 		if (null == balance) {
 			throw new DebugServiceException("服务不存在：" + serviceName);
 		}
@@ -585,5 +668,28 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 		if (null != m_ServiceDocCache) {
 			m_ServiceDocCache.onGcCleanup(policy);
 		}
+	}
+
+	@Override
+	public ResultPage<ServiceSummary> listServiceSummary(String keyword) {
+		ResultPage<String> names = listServiceName(keyword);
+		List<ServiceSummary> summarys = new ArrayList<ServiceSummary>(names.getCount());
+		for (String name : ResultPageHelper.toForeach(names)) {
+			ServiceInstanceBalance balance = m_ServiceBalances.get(name);
+			if (null == balance) {
+				continue;
+			}
+			NameItem status = balance.getEndpointSummary();
+			ServiceSummary s = new ServiceSummary(name);
+			s.setStatus(status.id);
+			s.setSummary(status.name);
+			summarys.add(s);
+		}
+		Collections.sort(summarys, ServiceSummary.CMP_DEFAULT);
+		return ResultPageHelper.toResultPage(summarys);
+	}
+	
+	protected ServiceInstanceBalance getServiceInstanceBalance(String name) {
+		return m_ServiceBalances.get(name);
 	}
 }

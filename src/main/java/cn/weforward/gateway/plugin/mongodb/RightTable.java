@@ -23,7 +23,7 @@ import cn.weforward.gateway.plugin.mongodb.di.RightTableDi;
  * @author zhangpengji
  *
  */
-public class RightTable extends AbstractPersistent<RightTableDi> { // implements Reloadable<RightTable>
+public class RightTable extends AbstractPersistent<RightTableDi> implements VoPersistent<RightTableVo> {
 
 	@Resource
 	RightTableVo m_Vo;
@@ -39,12 +39,14 @@ public class RightTable extends AbstractPersistent<RightTableDi> { // implements
 		markPersistenceUpdate();
 	}
 
-	void updateVo(RightTableVo vo) {
+	@Override
+	public void updateVo(RightTableVo vo) {
 		m_Vo = vo;
 		markPersistenceUpdate();
 	}
 
-	RightTableVo getVo() {
+	@Override
+	public RightTableVo getVo() {
 		return m_Vo;
 	}
 
@@ -61,12 +63,13 @@ public class RightTable extends AbstractPersistent<RightTableDi> { // implements
 	// return true;
 	// }
 
-	boolean reload(RightTable other) {
+	@Override
+	public boolean reload(VoPersistent<RightTableVo> other) {
 		if (null == other) {
 			return false;
 		}
 		synchronized (this) {
-			m_Vo = other.m_Vo;
+			m_Vo = ((RightTable) other).m_Vo;
 		}
 		return true;
 	}

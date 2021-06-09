@@ -41,6 +41,9 @@ public class ServiceInstance extends SimpleService implements ServiceExt {
 	/** @see #getState() */
 	@Resource
 	protected int m_State;
+	/** 所在的网格 */
+	@Resource
+	protected MeshNode m_MeshNode;
 
 	public ServiceInstance(Service service, String owner, Date heartbeat) {
 		super(service);
@@ -58,6 +61,16 @@ public class ServiceInstance extends SimpleService implements ServiceExt {
 		m_Owner = foreign.getOwner();
 		m_Heartbeat = foreign.getHeartbeat();
 		// m_State = service.getState(); 略过状态
+	}
+
+	/**
+	 * 由其他网关的微服务信息构造
+	 * 
+	 * @param foreign
+	 */
+	public ServiceInstance(ServiceInstance foreign) {
+		this((ServiceExt) foreign);
+		m_MeshNode = foreign.getMeshNode();
 	}
 
 	// public static ServiceInstance valueOf(ServiceExt service) {
@@ -227,5 +240,26 @@ public class ServiceInstance extends SimpleService implements ServiceExt {
 
 	public boolean isHoninyunMode() {
 		return isMark(MARK_HONINYUN_MODE);
+	}
+
+	public MeshNode getMeshNode() {
+		return m_MeshNode;
+	}
+
+	public void setMeshNode(MeshNode meshNode) {
+		m_MeshNode = meshNode;
+	}
+
+	public String getMeshNodeId() {
+		return (null == m_MeshNode) ? null : m_MeshNode.getId();
+	}
+
+	/**
+	 * 此服务实例在本网格中
+	 * 
+	 * @return
+	 */
+	public boolean isSelfMesh() {
+		return null == m_MeshNode || m_MeshNode.isSelf();
 	}
 }

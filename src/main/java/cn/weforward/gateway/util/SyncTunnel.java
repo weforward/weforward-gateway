@@ -32,7 +32,7 @@ public class SyncTunnel extends ImitatedTunnel {
 
 	public SyncTunnel(String serviceName, DtObject invokeObject) {
 		super(serviceName, invokeObject);
-		setWaitTimeout(30 * 1000);
+		setWaitTimeout(30);
 	}
 
 	/**

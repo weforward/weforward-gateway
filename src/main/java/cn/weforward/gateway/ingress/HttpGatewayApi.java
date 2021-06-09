@@ -159,7 +159,7 @@ public class HttpGatewayApi implements ServerHandler, Runnable, Producer.Output 
 	}
 
 	protected void writeHeader(HttpHeaderOutput output, Header header) throws IOException {
-		HttpHyHeaderHelper.outHeaders(header, output);
+		HttpHeaderHelper.outHeaders(header, output);
 	}
 
 	private void executeApi() {

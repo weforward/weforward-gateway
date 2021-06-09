@@ -10,6 +10,7 @@
  */
 package cn.weforward.gateway.ops.traffic;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -140,4 +141,17 @@ public class TrafficTable implements cn.weforward.protocol.ops.traffic.TrafficTa
 		m_Manage.onTrafficRuleChange(this);
 	}
 
+	@Override
+	public void setItems(List<TrafficTableItem> items) {
+		List<TrafficTableItemVo> vos = Collections.emptyList();
+		if (!ListUtil.isEmpty(items)) {
+			vos = new ArrayList<>(items.size());
+			for (TrafficTableItem item : items) {
+				TrafficTableItemVo vo = TrafficTableItemVo.valueOf(item);
+				vos.add(vo);
+			}
+		}
+		getVo().items = vos;
+		markUpdate();
+	}
 }

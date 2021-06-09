@@ -10,15 +10,6 @@
  */
 package cn.weforward.gateway.plugin.mongodb;
 
-import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.function.Supplier;
-
-import cn.weforward.common.NameItem;
-import cn.weforward.common.ResultPage;
-import cn.weforward.common.util.ResultPageHelper;
-import cn.weforward.common.util.TransResultPage;
-import cn.weforward.data.persister.ChangeListener;
 import cn.weforward.data.persister.Persistent;
 import cn.weforward.data.persister.Persister;
 import cn.weforward.data.persister.PersisterFactory;
@@ -32,100 +23,33 @@ import cn.weforward.gateway.plugin.mongodb.di.MasterKeyDi;
  * @author zhangpengji
  *
  */
-public class MasterKeyVoFactoryImpl implements MasterKeyVoFactory, MasterKeyDi {
-
-	Persister<MasterKey> m_PsMasterKey;
-	List<ReloadListener> m_Listeners;
+public class MasterKeyVoFactoryImpl extends AbstractVoFactoryImpl<MasterKey, MasterKeyVo> implements MasterKeyVoFactory, MasterKeyDi {
 
 	MasterKeyVoFactoryImpl(PersisterFactory factory) {
-		m_PsMasterKey = factory.createPersister(MasterKey.class, this);
-		//m_PsMasterKey.setReloadEnabled(true);
-		m_PsMasterKey.addListener(new ChangeListener<MasterKey>() {
-
-			@Override
-			public void onChange(NameItem type, String id, Supplier<MasterKey> supplierdata) {
-				if (ChangeListener.TYPE_NEW.id == type.id || ChangeListener.TYPE_UPDATE.id == type.id) {
-					MasterKey mk = m_PsMasterKey.get(id);
-					mk.reload(supplierdata.get());
-					MasterKeyVoFactoryImpl.this.onReload(mk);
-				}
-			}
-		});
-		m_Listeners = new CopyOnWriteArrayList<ReloadListener>();
-	}
-
-	// @Override
-	// public String genPersistenceId(String prefix) {
-	// String id = m_PsMasterKey.getNewId(prefix).getOrdinal();
-	// if (-1 != id.indexOf(Access.SPEARATOR)) {
-	// id = id.replace(Access.SPEARATOR_STR, "");
-	// }
-	// return id;
-	// }
-
-	@Override
-	public MasterKeyVo get(String id) {
-		MasterKey obj = m_PsMasterKey.get(id);
-		if (null == obj) {
-			return null;
-		}
-		return obj.getVo();
-	}
-
-	@Override
-	public void put(MasterKeyVo masterKeyVo) {
-		String id = masterKeyVo.id;
-		MasterKey obj = m_PsMasterKey.get(id);
-		if (null == obj) {
-			synchronized (this) {
-				obj = m_PsMasterKey.get(id);
-				if (null == obj) {
-					obj = new MasterKey(this, masterKeyVo);
-					return;
-				}
-			}
-		}
-		obj.updateVo(masterKeyVo);
-	}
-
-	@Override
-	public ResultPage<MasterKeyVo> startsWith(String prefix) {
-		ResultPage<MasterKey> rp = m_PsMasterKey.startsWith(prefix);
-		if (0 == rp.getCount()) {
-			return ResultPageHelper.empty();
-		}
-		return new TransResultPage<MasterKeyVo, MasterKey>(rp) {
-
-			@Override
-			protected MasterKeyVo trans(MasterKey src) {
-				return src.getVo();
-			}
-		};
+		super(factory);
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
 	public <E extends Persistent> Persister<E> getPersister(Class<E> clazz) {
 		if (clazz == MasterKey.class) {
-			return (Persister<E>) m_PsMasterKey;
+			return (Persister<E>) m_Persister;
 		}
 		return null;
 	}
 
 	@Override
-	public void registerReloadListener(ReloadListener listener) {
-		m_Listeners.add(listener);
+	protected Persister<MasterKey> createPersister(PersisterFactory factory) {
+		return factory.createPersister(MasterKey.class, this);
 	}
 
 	@Override
-	public boolean unregisterReloadListener(ReloadListener listener) {
-		return m_Listeners.remove(listener);
-	}
-	
-	public void onReload(MasterKey obj) {
-		for (ReloadListener listener : m_Listeners) {
-			listener.onReload(obj.getVo());
-		}
+	protected String getVoId(MasterKeyVo vo) {
+		return vo.id;
 	}
 
+	@Override
+	protected MasterKey createVoPersistent(MasterKeyVo vo) {
+		return new MasterKey(this, vo);
+	}
 }

@@ -39,6 +39,30 @@ public class TrafficTableVo {
 
 	}
 
+	public String getId() {
+		return id;
+	}
+
+	public void setId(String id) {
+		this.id = id;
+	}
+
+	public String getName() {
+		return name;
+	}
+
+	public void setName(String name) {
+		this.name = name;
+	}
+
+	public List<TrafficTableItemVo> getItems() {
+		return items;
+	}
+
+	public void setItems(List<TrafficTableItemVo> items) {
+		this.items = items;
+	}
+
 	public static class TrafficTableItemVo implements Nameable {
 		@Resource
 		public String name;

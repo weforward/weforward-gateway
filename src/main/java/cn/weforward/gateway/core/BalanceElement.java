@@ -37,6 +37,8 @@ public abstract class BalanceElement {
 
 	/** 权重 - 后备资源 */
 	public final static int WEIGHT_BACKUP = -100;
+	/** 权重 - 预发资源（预发资源允许指定实例） */
+	public final static int WEIGHT_PREPARE = -200;
 	/** 权重 - 资源忙 */
 	public final static int WEIGHT_BUSY = 0;
 	/** 权重 - 资源使用异常 */

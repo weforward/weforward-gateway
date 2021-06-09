@@ -23,7 +23,7 @@ import cn.weforward.gateway.plugin.mongodb.di.AclTableDi;
  * @author zhangpengji
  *
  */
-public class AclTable extends AbstractPersistent<AclTableDi> { // implements Reloadable<AclTable>
+public class AclTable extends AbstractPersistent<AclTableDi> implements VoPersistent<AclTableVo> {
 
 	@Resource
 	AclTableVo m_Vo;
@@ -39,12 +39,14 @@ public class AclTable extends AbstractPersistent<AclTableDi> { // implements Rel
 		markPersistenceUpdate();
 	}
 
-	void updateVo(AclTableVo vo) {
+	@Override
+	public void updateVo(AclTableVo vo) {
 		m_Vo = vo;
 		markPersistenceUpdate();
 	}
 
-	AclTableVo getVo() {
+	@Override
+	public AclTableVo getVo() {
 		return m_Vo;
 	}
 
@@ -61,12 +63,13 @@ public class AclTable extends AbstractPersistent<AclTableDi> { // implements Rel
 	// return true;
 	// }
 
-	boolean reload(AclTable other) {
+	@Override
+	public boolean reload(VoPersistent<AclTableVo> other) {
 		if (null == other) {
 			return false;
 		}
 		synchronized (this) {
-			m_Vo = other.m_Vo;
+			m_Vo = ((AclTable) other).m_Vo;
 		}
 		return true;
 	}

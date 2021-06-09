@@ -23,7 +23,7 @@ import cn.weforward.gateway.plugin.mongodb.di.TrafficTableDi;
  * @author zhangpengji
  *
  */
-public class TrafficTable extends AbstractPersistent<TrafficTableDi> {// implements Reloadable<TrafficTable>
+public class TrafficTable extends AbstractPersistent<TrafficTableDi> implements VoPersistent<TrafficTableVo> {
 
 	@Resource
 	TrafficTableVo m_Vo;
@@ -39,12 +39,14 @@ public class TrafficTable extends AbstractPersistent<TrafficTableDi> {// impleme
 		markPersistenceUpdate();
 	}
 
-	void updateVo(TrafficTableVo vo) {
+	@Override
+	public void updateVo(TrafficTableVo vo) {
 		m_Vo = vo;
 		markPersistenceUpdate();
 	}
 
-	TrafficTableVo getVo() {
+	@Override
+	public TrafficTableVo getVo() {
 		return m_Vo;
 	}
 
@@ -61,12 +63,13 @@ public class TrafficTable extends AbstractPersistent<TrafficTableDi> {// impleme
 	// return true;
 	// }
 
-	boolean reload(TrafficTable other) {
+	@Override
+	public boolean reload(VoPersistent<TrafficTableVo> other) {
 		if (null == other) {
 			return false;
 		}
 		synchronized (this) {
-			m_Vo = other.m_Vo;
+			m_Vo = ((TrafficTable) other).m_Vo;
 		}
 		return true;
 	}

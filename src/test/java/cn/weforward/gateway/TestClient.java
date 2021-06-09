@@ -25,8 +25,8 @@ import cn.weforward.protocol.client.ext.RequestInvokeObject;
 
 public class TestClient {
 
-	String accessId = "H-093dc2130128-093dc2130128";
-	String accessKey = "513c55c44ada322a9f8e86f580fbad20480034d8b5f32577bfb307cc842bced1";
+	String accessId = "H-0947f4f50120-0953737501cb";
+	String accessKey = "03eab5fc14b8821602329baa2f90c8ca7f5217d1a8626d04b5c629d32559582e";
 	String url = "http://127.0.0.1:5661";
 
 	// @Before
@@ -58,7 +58,8 @@ public class TestClient {
 
 	@Test
 	public void main() throws Exception {
-		testCall();
+		// testCall();
+		testTopic();
 		// testTag();
 		// testBalance();
 		// testTrace();
@@ -92,7 +93,7 @@ public class TestClient {
 			invoker.setAuthType(Header.AUTH_TYPE_SHA2);
 		}
 		RequestInvokeObject invoke = new RequestInvokeObject("say_hello");
-		invoke.putParam("name", "浩宁云");
+		invoke.putParam("name", "weforward");
 		/*
 		 * File file = new File("1.png"); FileInputStream in = new
 		 * FileInputStream(file); BytesOutputStream bos = new BytesOutputStream(in);
@@ -111,6 +112,27 @@ public class TestClient {
 		}
 		System.out.println(resp.getServiceResult());
 		System.out.println(resp.getResourceUrl());
+	}
+
+	void testTopic() {
+		List<String> urls = new ArrayList<>();
+		urls.add(url + "/test;test2");
+		ServiceInvoker invoker = ServiceInvokerFactory.create(urls, accessId, accessKey);
+		if (StringUtil.isEmpty(accessId)) {
+			invoker.setAuthType(Header.AUTH_TYPE_NONE);
+		} else {
+			invoker.setAuthType(Header.AUTH_TYPE_SHA2);
+		}
+		RequestInvokeObject invoke = new RequestInvokeObject("topic");
+		invoke.putParam("topic", "order_status");
+		Request req = invoker.createRequest(invoke.toDtObject());
+		req.getHeader().setChannel(Header.CHANNEL_TOPIC);
+		req.setWaitTimeout(3600);
+		Response resp = invoker.invoke(req);
+		if (0 != resp.getResponseCode()) {
+			System.out.println(resp.getResponseCode() + "/" + resp.getResponseMsg());
+		}
+		System.out.println(resp.getServiceResult());
 	}
 
 	// void testTag() throws Exception {

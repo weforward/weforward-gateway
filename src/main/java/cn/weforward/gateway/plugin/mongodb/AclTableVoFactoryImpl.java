@@ -10,15 +10,6 @@
  */
 package cn.weforward.gateway.plugin.mongodb;
 
-import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.function.Supplier;
-
-import cn.weforward.common.NameItem;
-import cn.weforward.common.ResultPage;
-import cn.weforward.common.util.ResultPageHelper;
-import cn.weforward.common.util.TransResultPage;
-import cn.weforward.data.persister.ChangeListener;
 import cn.weforward.data.persister.Persistent;
 import cn.weforward.data.persister.Persister;
 import cn.weforward.data.persister.PersisterFactory;
@@ -32,92 +23,35 @@ import cn.weforward.gateway.plugin.mongodb.di.AclTableDi;
  * @author zhangpengji
  *
  */
-public class AclTableVoFactoryImpl implements AclTableVoFactory, AclTableDi {
-
-	Persister<AclTable> m_PsAclTable;
-	List<ReloadListener> m_Listeners;
+public class AclTableVoFactoryImpl extends AbstractVoFactoryImpl<AclTable, AclTableVo>
+		implements AclTableVoFactory, AclTableDi {
 
 	AclTableVoFactoryImpl(PersisterFactory factory) {
-		m_PsAclTable = factory.createPersister(AclTable.class, this);
-		// m_PsAclTable.setReloadEnabled(true);
-		m_PsAclTable.addListener(new ChangeListener<AclTable>() {
-
-			@Override
-			public void onChange(NameItem type, String id, Supplier<AclTable> supplierdata) {
-				if (ChangeListener.TYPE_NEW.id == type.id || ChangeListener.TYPE_UPDATE.id == type.id) {
-					AclTable table = m_PsAclTable.get(id);
-					table.reload(supplierdata.get());
-					AclTableVoFactoryImpl.this.onReload(table);
-				}
-			}
-		});
-		m_Listeners = new CopyOnWriteArrayList<ReloadListener>();
-	}
-
-	@Override
-	public AclTableVo get(String id) {
-		AclTable obj = m_PsAclTable.get(id);
-		if (null == obj) {
-			return null;
-		}
-		return obj.getVo();
-	}
-
-	@Override
-	public void put(AclTableVo vo) {
-		String id = vo.id;
-		AclTable obj = m_PsAclTable.get(id);
-		if (null == obj) {
-			synchronized (this) {
-				obj = m_PsAclTable.get(id);
-				if (null == obj) {
-					obj = new AclTable(this, vo);
-					return;
-				}
-			}
-		}
-		obj.updateVo(vo);
-	}
-
-	@Override
-	public ResultPage<AclTableVo> startsWith(String prefix) {
-		ResultPage<AclTable> rp = m_PsAclTable.startsWith(prefix);
-		if (0 == rp.getCount()) {
-			return ResultPageHelper.empty();
-		}
-		return new TransResultPage<AclTableVo, AclTable>(rp) {
-
-			@Override
-			protected AclTableVo trans(AclTable src) {
-				return src.getVo();
-			}
-		};
-	}
-
-	@Override
-	public void registerReloadListener(ReloadListener listener) {
-		m_Listeners.add(listener);
-	}
-
-	@Override
-	public boolean unregisterReloadListener(ReloadListener listener) {
-		return m_Listeners.remove(listener);
+		super(factory);
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
 	public <E extends Persistent> Persister<E> getPersister(Class<E> clazz) {
 		if (clazz == AclTable.class) {
-			return (Persister<E>) m_PsAclTable;
+			return (Persister<E>) m_Persister;
 		}
 		return null;
 	}
 
 	@Override
-	public void onReload(AclTable obj) {
-		for (ReloadListener listener : m_Listeners) {
-			listener.onReload(obj.getVo());
-		}
+	protected Persister<AclTable> createPersister(PersisterFactory factory) {
+		return factory.createPersister(AclTable.class, this);
+	}
+
+	@Override
+	protected String getVoId(AclTableVo vo) {
+		return vo.id;
+	}
+
+	@Override
+	protected AclTable createVoPersistent(AclTableVo vo) {
+		return new AclTable(this, vo);
 	}
 
 }

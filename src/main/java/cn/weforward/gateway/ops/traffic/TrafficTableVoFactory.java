@@ -10,8 +10,8 @@
  */
 package cn.weforward.gateway.ops.traffic;
 
-import cn.weforward.common.ResultPage;
 import cn.weforward.gateway.Pluginable;
+import cn.weforward.gateway.ops.VoFactory;
 
 /**
  * <code>TrafficTableVo</code>工厂
@@ -19,48 +19,6 @@ import cn.weforward.gateway.Pluginable;
  * @author zhangpengji
  *
  */
-public interface TrafficTableVoFactory extends Pluginable {
+public interface TrafficTableVoFactory extends VoFactory<TrafficTableVo>, Pluginable {
 
-	/**
-	 * 按id获取TrafficTableVo
-	 * 
-	 * @param id
-	 * @return
-	 */
-	TrafficTableVo get(String id);
-
-	/**
-	 * 置入一个trafficTableVo
-	 * 
-	 * @param trafficTableVo
-	 */
-	void put(TrafficTableVo trafficTableVo);
-
-	/**
-	 * 按id前缀搜索
-	 * 
-	 * @param prefix
-	 * @return
-	 */
-	ResultPage<TrafficTableVo> startsWith(String prefix);
-
-	/**
-	 * 注册重载监听器
-	 *
-	 * @param listener
-	 */
-	void registerReloadListener(ReloadListener listener);
-
-	/**
-	 * 注销重载监听器
-	 *
-	 * @param listener
-	 * @return 注销成功返回true
-	 */
-	boolean unregisterReloadListener(ReloadListener listener);
-
-	interface ReloadListener {
-
-		void onReload(TrafficTableVo trafficTableVo);
-	}
 }

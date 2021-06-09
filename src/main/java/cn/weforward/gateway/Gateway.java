@@ -15,7 +15,6 @@ import cn.weforward.protocol.RequestConstants;
 import cn.weforward.protocol.Service;
 import cn.weforward.protocol.exception.UnReadyException;
 import cn.weforward.protocol.ext.ServiceRuntime;
-import cn.weforward.protocol.ops.ServiceExt;
 
 /**
  * 网关
@@ -83,7 +82,7 @@ public interface Gateway {
 	 *            服务名称，可空
 	 * @return
 	 */
-	ResultPage<ServiceExt> listService(String name);
+	ResultPage<ServiceInstance> listService(String name);
 
 	/**
 	 * 查询微服务（实例）
@@ -92,5 +91,5 @@ public interface Gateway {
 	 * @param runningId
 	 * @return
 	 */
-	ResultPage<ServiceExt> searchService(String keyword, String runningId);
+	ResultPage<ServiceInstance> searchService(String keyword, String runningId);
 }

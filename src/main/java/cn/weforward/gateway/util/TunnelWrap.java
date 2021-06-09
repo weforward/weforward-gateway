@@ -30,6 +30,10 @@ public abstract class TunnelWrap implements Tunnel {
 	protected TunnelWrap(Tunnel tunnel) {
 		m_Tunnel = tunnel;
 	}
+	
+	public Tunnel getTunnel() {
+		return m_Tunnel;
+	}
 
 	@Override
 	public Header getHeader() {

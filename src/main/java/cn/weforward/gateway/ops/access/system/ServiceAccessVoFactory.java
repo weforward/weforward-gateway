@@ -10,8 +10,8 @@
  */
 package cn.weforward.gateway.ops.access.system;
 
-import cn.weforward.common.ResultPage;
 import cn.weforward.gateway.Pluginable;
+import cn.weforward.gateway.ops.VoFactory;
 
 /**
  * <code>ServiceAccessVo</code>工厂
@@ -19,67 +19,6 @@ import cn.weforward.gateway.Pluginable;
  * @author zhangpengji
  *
  */
-public interface ServiceAccessVoFactory extends Pluginable {
+public interface ServiceAccessVoFactory extends VoFactory<ServiceAccessVo>, Pluginable {
 
-	// /**
-	// * 生成新ID并加上指定前缀
-	// * <p>
-	// * 新ID不能包含Access的保留字符，如{@linkplain Access#SPEARATOR}
-	// *
-	// * @param prefix
-	// * @return
-	// */
-	// String genPersistenceId(String prefix);
-
-	/**
-	 * 按id获取SystemAccessVo
-	 * 
-	 * @param id
-	 * @return
-	 */
-	ServiceAccessVo get(String id);
-
-	/**
-	 * 置入一个SystemAccessVo
-	 * 
-	 * @param accessVo
-	 */
-	void put(ServiceAccessVo accessVo);
-
-	/**
-	 * 按id前缀搜索
-	 * 
-	 * @param prefix
-	 * @return
-	 */
-	ResultPage<ServiceAccessVo> startsWith(String prefix);
-
-	/**
-	 * 查找ID为指定前缀的对象
-	 * 
-	 * @param prefix
-	 *            ID前缀
-	 * @return 对象结果页
-	 */
-	ResultPage<String> startsWithOfId(String prefix);
-
-	/**
-	 * 注册重载监听器
-	 *
-	 * @param listener
-	 */
-	void registerReloadListener(ReloadListener listener);
-
-	/**
-	 * 注销重载监听器
-	 *
-	 * @param listener
-	 * @return 注销成功返回true
-	 */
-	boolean unregisterReloadListener(ReloadListener listener);
-
-	interface ReloadListener {
-
-		void onReload(ServiceAccessVo accessVo);
-	}
 }

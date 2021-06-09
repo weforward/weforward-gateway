@@ -38,7 +38,7 @@ class HeaderChecker {
 		}
 		String channel = header.getChannel();
 		if (!StringUtil.isEmpty(channel) && !Header.CHANNEL_ALL.contains(channel)) {
-			return new CheckResult(WeforwardException.CODE_SERIAL_ERROR, "channel invalid:" + charset);
+			return new CheckResult(WeforwardException.CODE_SERIAL_ERROR, "channel invalid:" + channel);
 		}
 		return SUCCESS;
 	}

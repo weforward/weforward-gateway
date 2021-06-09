@@ -74,7 +74,7 @@ public class DataFactory implements Pluginable, PropertiesLoaderAware, PluginCon
 		MongodbPersisterFactory factory = new MongodbPersisterFactory(connection, dbName);
 		factory.setServerId(serverId);
 
-		DelayFlusher flusher = new DelayFlusher();
+		DelayFlusher flusher = new DelayFlusher(1);
 		factory.setFlusher(flusher);
 
 		m_Factory = factory;

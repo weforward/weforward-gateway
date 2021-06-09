@@ -17,8 +17,10 @@ import java.util.List;
 import cn.weforward.common.ResultPage;
 import cn.weforward.common.util.ResultPageHelper;
 import cn.weforward.common.util.StringUtil;
+import cn.weforward.common.util.TransList;
 import cn.weforward.common.util.TransResultPage;
 import cn.weforward.gateway.GatewayExt;
+import cn.weforward.gateway.ServiceInstance;
 import cn.weforward.gateway.exception.DebugServiceException;
 import cn.weforward.gateway.ops.access.AccessManage;
 import cn.weforward.gateway.ops.right.RightManage;
@@ -27,6 +29,7 @@ import cn.weforward.protocol.Header;
 import cn.weforward.protocol.ServiceName;
 import cn.weforward.protocol.client.ext.ResponseResultObject;
 import cn.weforward.protocol.doc.ServiceDocument;
+import cn.weforward.protocol.gateway.ServiceSummary;
 import cn.weforward.protocol.gateway.vo.AccessExtVo;
 import cn.weforward.protocol.gateway.vo.RightTableItemVo;
 import cn.weforward.protocol.gateway.vo.RightTableItemWrap;
@@ -36,7 +39,6 @@ import cn.weforward.protocol.gateway.vo.TrafficTableItemVo;
 import cn.weforward.protocol.gateway.vo.TrafficTableItemWrap;
 import cn.weforward.protocol.gateway.vo.TrafficTableVo;
 import cn.weforward.protocol.ops.AccessExt;
-import cn.weforward.protocol.ops.ServiceExt;
 import cn.weforward.protocol.ops.secure.RightTable;
 import cn.weforward.protocol.ops.secure.RightTableItem;
 import cn.weforward.protocol.ops.traffic.TrafficTable;
@@ -73,6 +75,7 @@ class KeeperApi extends AbstractGatewayApi {
 		mappers.register(BeanObjectMapper.getInstance(RightTableItemVo.class));
 		mappers.register(BeanObjectMapper.getInstance(TrafficTableVo.class));
 		mappers.register(BeanObjectMapper.getInstance(TrafficTableItemVo.class));
+		mappers.register(BeanObjectMapper.getInstance(ServiceSummary.class));
 		PageDataMapper pageDataMapper = new PageDataMapper(mappers);
 		mappers.register(pageDataMapper);
 		m_Mappers = mappers;
@@ -84,6 +87,7 @@ class KeeperApi extends AbstractGatewayApi {
 
 		register(listService);
 		register(listServiceName);
+		register(listServiceSummary);
 		register(searchService);
 
 		register(getRightTable);
@@ -92,6 +96,7 @@ class KeeperApi extends AbstractGatewayApi {
 		register(moveRightRule);
 		register(replaceRightRule);
 		register(removeRightRule);
+		register(setRightRules);
 
 		register(getTrafficTable);
 		register(appendeTrafficRule);
@@ -99,6 +104,7 @@ class KeeperApi extends AbstractGatewayApi {
 		register(moveTrafficRule);
 		register(replaceTrafficRule);
 		register(removeTrafficRule);
+		register(setTrafficRules);
 
 		register(getDocuments);
 		register(debugService);
@@ -223,6 +229,30 @@ class KeeperApi extends AbstractGatewayApi {
 		}
 	};
 
+	private ApiMethod listServiceSummary = new ApiMethod("list_service_summary", true) {
+
+		@Override
+		PageData execute(Header reqHeader, FriendlyObject params) throws ApiException {
+			String keyword = params.getString("keyword");
+			if (!StringUtil.isEmpty(keyword)) {
+				if ('*' != keyword.charAt(0)) {
+					keyword = '*' + keyword;
+				}
+				if ('*' != keyword.charAt(keyword.length() - 1)) {
+					keyword = keyword + '*';
+				}
+			}
+			int page = params.getInt("page", 1);
+			int pageSize = params.getInt("page_size", 50);
+			ResultPage<ServiceSummary> summarys = m_Gateway.listServiceSummary(keyword);
+			if (summarys.getCount() > 0) {
+				summarys.setPageSize(pageSize);
+				summarys.gotoPage(page);
+			}
+			return new PageData(summarys);
+		}
+	};
+
 	private ApiMethod listService = new ApiMethod("list_service") {
 
 		@Override
@@ -231,12 +261,12 @@ class KeeperApi extends AbstractGatewayApi {
 			int page = params.getInt("page", 1);
 			int pageSize = params.getInt("page_size", 50);
 			ResultPage<ServiceExtVo> vos = ResultPageHelper.empty();
-			ResultPage<ServiceExt> rp = m_Gateway.listService(name);
+			ResultPage<ServiceInstance> rp = m_Gateway.listService(name);
 			if (rp.getCount() > 0) {
-				vos = new TransResultPage<ServiceExtVo, ServiceExt>(rp) {
+				vos = new TransResultPage<ServiceExtVo, ServiceInstance>(rp) {
 
 					@Override
-					protected ServiceExtVo trans(ServiceExt src) {
+					protected ServiceExtVo trans(ServiceInstance src) {
 						return new ServiceExtVo(src);
 					}
 				};
@@ -256,12 +286,12 @@ class KeeperApi extends AbstractGatewayApi {
 			int page = params.getInt("page", 1);
 			int pageSize = params.getInt("page_size", 50);
 			ResultPage<ServiceExtVo> vos = ResultPageHelper.empty();
-			ResultPage<ServiceExt> rp = m_Gateway.searchService(keyword, runningId);
+			ResultPage<ServiceInstance> rp = m_Gateway.searchService(keyword, runningId);
 			if (rp.getCount() > 0) {
-				vos = new TransResultPage<ServiceExtVo, ServiceExt>(rp) {
+				vos = new TransResultPage<ServiceExtVo, ServiceInstance>(rp) {
 
 					@Override
-					protected ServiceExtVo trans(ServiceExt src) {
+					protected ServiceExtVo trans(ServiceInstance src) {
 						return new ServiceExtVo(src);
 					}
 				};
@@ -355,6 +385,25 @@ class KeeperApi extends AbstractGatewayApi {
 		}
 	};
 
+	private ApiMethod setRightRules = new ApiMethod("set_right_rules") {
+
+		@Override
+		RightTableVo execute(Header reqHeader, FriendlyObject params) throws ApiException {
+			String name = params.getString("name");
+			List<RightTableItemVo> vos = params.getList("items", RightTableItemVo.class, m_Mappers);
+			RightTable table = m_RightManage.openRightTable(name);
+			List<RightTableItem> items = new TransList<RightTableItem, RightTableItemVo>(vos) {
+
+				@Override
+				protected RightTableItem trans(RightTableItemVo src) {
+					return new RightTableItemWrap(src);
+				}
+			};
+			table.setItems(items);
+			return new RightTableVo(table);
+		}
+	};
+
 	private ApiMethod getTrafficTable = new ApiMethod("get_traffic_table") {
 
 		@Override
@@ -434,6 +483,25 @@ class KeeperApi extends AbstractGatewayApi {
 			int to = params.getInt("to", -1);
 			TrafficTable table = m_TrafficManage.openTrafficTable(name);
 			table.moveItem(from, to);
+			return new TrafficTableVo(table);
+		}
+	};
+
+	private ApiMethod setTrafficRules = new ApiMethod("set_traffic_rules") {
+
+		@Override
+		TrafficTableVo execute(Header reqHeader, FriendlyObject params) throws ApiException {
+			String name = params.getString("name");
+			List<TrafficTableItemVo> vos = params.getList("items", TrafficTableItemVo.class, m_Mappers);
+			TrafficTable table = m_TrafficManage.openTrafficTable(name);
+			List<TrafficTableItem> items = new TransList<TrafficTableItem, TrafficTableItemVo>(vos) {
+
+				@Override
+				protected TrafficTableItem trans(TrafficTableItemVo src) {
+					return new TrafficTableItemWrap(src);
+				}
+			};
+			table.setItems(items);
 			return new TrafficTableVo(table);
 		}
 	};

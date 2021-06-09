@@ -96,6 +96,15 @@ public interface Tunnel {
 		return false;
 	}
 
+	/**
+	 * 是否来其他网格的转发
+	 * 
+	 * @return
+	 */
+	default boolean isFromMeshForward() {
+		return false;
+	}
+
 	// /**
 	// * 输出错误
 	// *
