@@ -27,12 +27,13 @@ import cn.weforward.protocol.Header;
 import cn.weforward.protocol.Request;
 import cn.weforward.protocol.Response;
 import cn.weforward.protocol.ServiceName;
+import cn.weforward.protocol.aio.Headers;
+import cn.weforward.protocol.aio.ServerContext;
 import cn.weforward.protocol.aio.ServerHandler;
 import cn.weforward.protocol.aio.http.HttpConstants;
 import cn.weforward.protocol.aio.http.HttpContext;
 import cn.weforward.protocol.aio.http.HttpHeaderHelper;
 import cn.weforward.protocol.aio.http.HttpHeaderOutput;
-import cn.weforward.protocol.aio.http.HttpHeaders;
 import cn.weforward.protocol.exception.AuthException;
 import cn.weforward.protocol.exception.WeforwardException;
 import cn.weforward.protocol.ext.Producer;
@@ -44,8 +45,8 @@ import cn.weforward.protocol.support.SimpleResponse;
  * @author zhangpengji
  *
  */
-public class HttpGatewayApi implements ServerHandler, Runnable, Producer.Output {
-	static final Logger _Logger = LoggerFactory.getLogger(HttpGatewayApi.class);
+public class GatewayApiHandler implements ServerHandler, Runnable, Producer.Output {
+	static final Logger _Logger = LoggerFactory.getLogger(GatewayApiHandler.class);
 
 	/** 进度 - 占位标识 */
 	static final int SCHEDULE_MASK = 0xFFFF;
@@ -56,7 +57,7 @@ public class HttpGatewayApi implements ServerHandler, Runnable, Producer.Output 
 	/** 进度 - 已取消 */
 	static final int SCHEDULE_MARK_ABORT = 0x10000;
 
-	HttpContext m_Context;
+	ServerContext m_Context;
 	ServerHandlerSupporter m_Supporter;
 	volatile OverloadLimitToken m_LimitToken;
 
@@ -66,13 +67,15 @@ public class HttpGatewayApi implements ServerHandler, Runnable, Producer.Output 
 	// 当前进度
 	volatile int m_Schedule;
 
-	HttpGatewayApi(HttpContext ctx, ServerHandlerSupporter supporter) {
+	GatewayApiHandler(ServerContext ctx, ServerHandlerSupporter supporter) {
 		this(ctx, supporter, null);
 	}
 
-	HttpGatewayApi(HttpContext ctx, ServerHandlerSupporter supporter, OverloadLimitToken limitToken) {
+	GatewayApiHandler(ServerContext ctx, ServerHandlerSupporter supporter, OverloadLimitToken limitToken) {
 		m_Context = ctx;
-		m_Context.setMaxHttpSize(Configure.getInstance().getGatewayApiMaxSize());
+		if (ctx instanceof HttpContext) {
+			((HttpContext) m_Context).setMaxHttpSize(Configure.getInstance().getGatewayApiMaxSize());
+		}
 
 		m_Supporter = supporter;
 
@@ -87,7 +90,7 @@ public class HttpGatewayApi implements ServerHandler, Runnable, Producer.Output 
 
 		String serviceName = HttpHeaderHelper.getServiceName(m_Context.getUri());
 		Header header = new Header(serviceName);
-		HttpHeaders hs = m_Context.getRequestHeaders();
+		Headers hs = m_Context.getRequestHeaders();
 		if (null != hs && hs.size() > 0) {
 			readHeader(hs, header);
 		}
@@ -120,8 +123,12 @@ public class HttpGatewayApi implements ServerHandler, Runnable, Producer.Output 
 	@Override
 	public void requestCompleted() {
 		try {
-			// 请求中断后上下文会清理请求内容，先缓存下来
-			m_RequestInput = m_Context.mirrorRequestStream(0);
+			if (m_Context instanceof HttpContext) {
+				// 请求中断后上下文会清理请求内容，先缓存下来
+				m_RequestInput = ((HttpContext) m_Context).mirrorRequestStream(0);
+			} else {
+				m_RequestInput = m_Context.getRequestStream();
+			}
 		} catch (IOException e) {
 			responseError(e);
 			return;
@@ -146,7 +153,7 @@ public class HttpGatewayApi implements ServerHandler, Runnable, Producer.Output 
 		return m_Supporter.getGateWayApis().getApi(apiName);
 	}
 
-	protected void readHeader(HttpHeaders hs, Header header) {
+	protected void readHeader(Headers hs, Header header) {
 		HttpHeaderHelper.fromHttpHeaders(hs, header);
 	}
 

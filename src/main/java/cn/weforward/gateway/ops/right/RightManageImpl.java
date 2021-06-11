@@ -16,7 +16,6 @@ import cn.weforward.common.util.LruCache;
 import cn.weforward.common.util.LruCache.CacheNode;
 import cn.weforward.common.util.LruCache.Loader;
 import cn.weforward.common.util.StringUtil;
-import cn.weforward.gateway.Configure;
 import cn.weforward.gateway.PluginContainer;
 import cn.weforward.gateway.PluginListener;
 import cn.weforward.gateway.Pluginable;
@@ -90,10 +89,6 @@ public class RightManageImpl implements RightManage, PluginListener, RightTableV
 	private InternalRightTable genDistributedRightTable() {
 		InternalRightTable table = new InternalRightTable(this, ServiceName.DISTRIBUTED.name);
 		table.addInternalItem(AccessExt.GATEWAY_INTERNAL_ACCESS_ID);
-		if (Configure.getInstance().isCompatMode()) {
-			table.addInternalItem("旧网关过渡", null, Access.KIND_SERVICE, null);
-			table.addInternalItem("新网关过渡", null, null, null);
-		}
 		return table;
 	}
 

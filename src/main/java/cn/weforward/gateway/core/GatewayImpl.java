@@ -323,10 +323,6 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 	@Override
 	public void registerService(String ownerAccessId, Service info, ServiceRuntime runtime) {
 		ServiceInstance service = new ServiceInstance(info, ownerAccessId, new Date());
-		if (null == runtime) {
-			// XXX 没有runtime信息的都当作是hy模式
-			service.setHoninyunMode(true);
-		}
 		registerServiceInner(service, false);
 
 		gaugeServiceRuntime(service, runtime);

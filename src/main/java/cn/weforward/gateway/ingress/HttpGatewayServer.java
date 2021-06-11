@@ -20,11 +20,13 @@ import cn.weforward.common.util.IpRanges;
 import cn.weforward.common.util.StringUtil;
 import cn.weforward.common.util.VersionUtil;
 import cn.weforward.gateway.Configure;
+import cn.weforward.protocol.aio.Headers;
+import cn.weforward.protocol.aio.ServerContext;
 import cn.weforward.protocol.aio.ServerHandler;
+import cn.weforward.protocol.aio.ServerHandlerFactory;
 import cn.weforward.protocol.aio.http.HttpConstants;
 import cn.weforward.protocol.aio.http.HttpContext;
 import cn.weforward.protocol.aio.http.HttpHeaders;
-import cn.weforward.protocol.aio.http.ServerHandlerFactory;
 import cn.weforward.protocol.aio.netty.NettyHttpServer;
 
 /**
@@ -161,7 +163,7 @@ public class HttpGatewayServer implements ServerHandlerFactory {
 	 * 
 	 * @return TRUE为可信、FALSE为拒绝访问、null为可访问
 	 */
-	protected CheckFromResult checkFrom(HttpContext ctx) throws IOException {
+	protected CheckFromResult checkFrom(ServerContext ctx) throws IOException {
 		String ip = ctx.getRemoteAddr();
 		if (null == ip || ip.length() < 7) {
 			// IP这么怪？
@@ -172,7 +174,7 @@ public class HttpGatewayServer implements ServerHandlerFactory {
 			// 去掉最后面的“:端口”
 			ip = ip.substring(0, idx);
 		}
-		HttpHeaders headers = null;
+		Headers headers = null;
 		if (null != m_ProxyIps && null != m_ProxyIps.find(ip)) {
 			// 经过了代理服务器的地址
 			headers = ctx.getRequestHeaders();
@@ -212,21 +214,21 @@ public class HttpGatewayServer implements ServerHandlerFactory {
 
 	private int getMethod(String method) {
 		method = method.toUpperCase();
-		if (HttpConstants.METHOD_GET.equals(method)) {
+		if (HttpConstants.METHOD_GET.equalsIgnoreCase(method)) {
 			return METHOD_GET;
 		}
-		if (HttpConstants.METHOD_POST.equals(method)) {
+		if (HttpConstants.METHOD_POST.equalsIgnoreCase(method)) {
 			return METHOD_POST;
 		}
-		if (HttpConstants.METHOD_OPTIONS.equals(method)) {
+		if (HttpConstants.METHOD_OPTIONS.equalsIgnoreCase(method)) {
 			return METHOD_OPTIONS;
 		}
 		return 0;
 	}
 
 	@Override
-	public ServerHandler handle(HttpContext ctx) throws IOException {
-		int method = getMethod(ctx.getMethod());
+	public ServerHandler handle(ServerContext ctx) throws IOException {
+		int method = getMethod(ctx.getVerb());
 		if (0 == (method & (METHOD_GET | METHOD_POST | METHOD_OPTIONS))) {
 			// 只支持GET或POST
 			ctx.response(HttpConstants.METHOD_NOT_ALLOWED, HttpContext.RESPONSE_AND_CLOSE);
@@ -258,16 +260,17 @@ public class HttpGatewayServer implements ServerHandlerFactory {
 		if (METHOD_GET == method && m_DocUriPattern.match(uri)) {
 			return openServiceDoc(ctx);
 		}
-		if (METHOD_POST == method && Configure.getInstance().isCompatMode()) {
-			if ("/hy_service_recorder".equals(uri) || "/hy_distributed".equals(uri)) {
-				return openHyGatewayApi(ctx);
-			}
+
+		if (!(ctx instanceof HttpContext)) {
+			ctx.response(HttpConstants.METHOD_NOT_ALLOWED, HttpContext.RESPONSE_AND_CLOSE);
+			ctx.disconnect();
+			return null;
 		}
 		if (m_StreamUriPattern.match(uri)) {
-			return openStreamTunnel(ctx);
+			return openStreamTunnel((HttpContext) ctx);
 		}
 		if (METHOD_POST == method && m_RpcUriPattern.match(uri)) {
-			return openTunnel(ctx, cfr);
+			return openTunnel((HttpContext) ctx, cfr);
 		}
 
 		ctx.response(HttpConstants.NOT_FOUND, HttpContext.RESPONSE_AND_CLOSE);
@@ -275,27 +278,19 @@ public class HttpGatewayServer implements ServerHandlerFactory {
 		return null;
 	}
 
-	private ServerHandler openGatewayApi(HttpContext ctx) throws IOException {
-		return new HttpGatewayApi(ctx, m_Supporter);
-	}
-
-	private ServerHandler openHyGatewayApi(HttpContext ctx) throws IOException {
-		return new HttpHyGatewayApi(ctx, m_Supporter);
+	private ServerHandler openGatewayApi(ServerContext ctx) throws IOException {
+		return new GatewayApiHandler(ctx, m_Supporter);
 	}
 
 	private ServerHandler openTunnel(HttpContext ctx, CheckFromResult cfr) throws IOException {
-		if(checkMeshForward(ctx)) {
+		if (checkMeshForward(ctx)) {
 			return new HttpMeshTunnel(ctx, m_Supporter, cfr.realIp, Boolean.TRUE.equals(cfr.trust));
 		}
-		if (Configure.getInstance().isCompatMode()) {
-			return new HttpHyTunnel(ctx, m_Supporter, cfr.realIp, Boolean.TRUE.equals(cfr.trust));
-		} else {
-			return new HttpTunnel(ctx, m_Supporter, cfr.realIp, Boolean.TRUE.equals(cfr.trust));
-		}
+		return new HttpTunnel(ctx, m_Supporter, cfr.realIp, Boolean.TRUE.equals(cfr.trust));
 	}
 
-	private ServerHandler openServiceDoc(HttpContext ctx) throws IOException {
-		return new HttpServiceDoc(ctx, m_Supporter);
+	private ServerHandler openServiceDoc(ServerContext ctx) throws IOException {
+		return new ServiceDocHandler(ctx, m_Supporter);
 	}
 
 	ServerHandler openStreamTunnel(HttpContext ctx) throws IOException {

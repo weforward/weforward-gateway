@@ -10,14 +10,10 @@
  */
 package cn.weforward.gateway.distribute;
 
-import cn.weforward.common.util.NumberUtil;
-import cn.weforward.common.util.StringUtil;
-import cn.weforward.gateway.Configure;
 import cn.weforward.protocol.datatype.DtObject;
 import cn.weforward.protocol.exception.ObjectMappingException;
 import cn.weforward.protocol.ext.ObjectMapper;
 import cn.weforward.protocol.support.BeanObjectMapper;
-import cn.weforward.protocol.support.datatype.SimpleDtObject;
 
 public class GatewayNodeMapper implements ObjectMapper<GatewayNode> {
 
@@ -38,22 +34,12 @@ public class GatewayNodeMapper implements ObjectMapper<GatewayNode> {
 	public DtObject toDtObject(GatewayNode node) throws ObjectMappingException {
 		GatewayNodeVo vo = GatewayNodeVo.valueOf(node);
 		DtObject result = m_Mapper.toDtObject(vo);
-		if (Configure.getInstance().isCompatMode()) {
-			SimpleDtObject dtObj = (SimpleDtObject) result;
-			dtObj.put("host", node.getHostName() + ":" + node.getPort());
-		}
 		return result;
 	}
 
 	@Override
 	public GatewayNode fromDtObject(DtObject obj) throws ObjectMappingException {
 		GatewayNodeVo vo = m_Mapper.fromDtObject(obj);
-		if (StringUtil.isEmpty(vo.hostName)) {
-			String host = obj.getString("host").value();
-			int idx = host.indexOf(':');
-			vo.hostName = host.substring(0, idx);
-			vo.port = NumberUtil.toInt(host.substring(idx + 1));
-		}
 		return new GatewayNodeWrap(vo);
 	}
 }

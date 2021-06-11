@@ -23,7 +23,7 @@
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<weforward-parent.version>1.2.1.219579</weforward-parent.version>
+		<weforward-parent.version>1.2.2</weforward-parent.version>
 	</properties>
 
 	<scm>

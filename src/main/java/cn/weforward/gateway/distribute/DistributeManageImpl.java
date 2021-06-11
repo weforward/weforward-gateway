@@ -31,7 +31,6 @@ import cn.weforward.common.json.StringInput;
 import cn.weforward.common.sys.Shutdown;
 import cn.weforward.common.util.ResultPageHelper;
 import cn.weforward.common.util.StringUtil;
-import cn.weforward.gateway.Configure;
 import cn.weforward.gateway.GatewayExt;
 import cn.weforward.gateway.PluginContainer;
 import cn.weforward.gateway.PluginListener;
@@ -192,7 +191,8 @@ public class DistributeManageImpl
 	}
 
 	@Override
-	public void syncFromBrother(List<GatewayNode> nodes, List<ServiceInstance> regServices, List<ServiceInstance> unregServices) {
+	public void syncFromBrother(List<GatewayNode> nodes, List<ServiceInstance> regServices,
+			List<ServiceInstance> unregServices) {
 		// 同步微服务
 		try {
 			m_Gateway.syncServices(regServices, unregServices, false);
@@ -315,7 +315,7 @@ public class DistributeManageImpl
 			GatewayNode other = (GatewayNode) obj;
 			return getId().equals(other.getId());
 		}
-		
+
 		void update(GatewayNode other) {
 			if (m_Permanent) {
 				return;
@@ -338,16 +338,11 @@ public class DistributeManageImpl
 				SingleServiceInvoker invoker = new SingleServiceInvoker(preUrl, ServiceName.DISTRIBUTED.name, null);
 				invoker.setConnectTimeout(3000);
 				invoker.setReadTimeout(5000);
-				if (Configure.getInstance().isCompatMode()) {
-					Producer producer = new SimpleProducer(AccessLoader.EMPTY);
-					invoker.setProducer(producer);
-					invoker.setAuthType(Header.AUTH_TYPE_NONE);
-				} else {
-					Producer producer = new SimpleProducer(new AccessLoader.Single(access));
-					invoker.setProducer(producer);
-					invoker.setAuthType(Header.AUTH_TYPE_SHA2);
-					invoker.setAccessId(access.getAccessId());
-				}
+
+				Producer producer = new SimpleProducer(new AccessLoader.Single(access));
+				invoker.setProducer(producer);
+				invoker.setAuthType(Header.AUTH_TYPE_SHA2);
+				invoker.setAccessId(access.getAccessId());
 				m_Invoker = invoker;
 			}
 			return m_Invoker;
@@ -409,7 +404,8 @@ public class DistributeManageImpl
 				invokeObj.putParam("reg_services", list);
 			}
 			if (null != unregServices && !unregServices.isEmpty()) {
-				DtList list = SimpleDtList.toDtList(unregServices, unregServices.size(), ServiceInstanceMapper.INSTANCE);
+				DtList list = SimpleDtList.toDtList(unregServices, unregServices.size(),
+						ServiceInstanceMapper.INSTANCE);
 				invokeObj.putParam("unreg_services", list);
 			}
 			Response resp = invoker.invoke(invokeObj.toDtObject());

@@ -85,11 +85,7 @@ public abstract class ServiceEndpoint extends BalanceElement {
 		if (ListUtil.isEmpty(service.getUrls())) {
 			return null;
 		}
-		if (service.isHoninyunMode()) {
-			return new HttpHyServiceEndpoint(group, service, rule);
-		} else {
-			return new HttpServiceEndpoint(group, service, rule);
-		}
+		return new HttpServiceEndpoint(group, service, rule);
 	}
 
 	void startGauge(String gatewayId, MeterRegistry registry) {
@@ -185,9 +181,6 @@ public abstract class ServiceEndpoint extends BalanceElement {
 			Collections.sort(url2);
 		}
 		if (!url1.equals(url2)) {
-			return false;
-		}
-		if (s1.isHoninyunMode() != s2.isHoninyunMode()) {
 			return false;
 		}
 		// 若所在网格变了，编号、链接应该都变了，故省略以下判断

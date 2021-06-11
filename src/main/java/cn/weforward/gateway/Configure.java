@@ -46,7 +46,7 @@ public class Configure {
 	private boolean m_NettyDebug = false;
 
 	// --------- 兼容性选项
-	private boolean m_CompatMode = false;
+	// private boolean m_CompatMode = false;
 	private boolean m_ShieldKepper = false;
 	private boolean m_NotVerifyAccessId = false;
 
@@ -58,14 +58,14 @@ public class Configure {
 		return INSTANCE;
 	}
 
-	/**
-	 * 是否兼容模式
-	 * 
-	 * @return
-	 */
-	public boolean isCompatMode() {
-		return m_CompatMode;
-	}
+//	/**
+//	 * 是否兼容模式
+//	 * 
+//	 * @return
+//	 */
+//	public boolean isCompatMode() {
+//		return m_CompatMode;
+//	}
 
 	/**
 	 * 是否屏蔽keeper api
@@ -377,12 +377,12 @@ public class Configure {
 			INSTANCE.m_ShieldKepper = Boolean.valueOf(boolStr);
 		}
 
-		public static void setCompatMode(String boolStr) {
-			if (StringUtil.isEmpty(boolStr)) {
-				return;
-			}
-			INSTANCE.m_CompatMode = Boolean.valueOf(boolStr);
-		}
+//		public static void setCompatMode(String boolStr) {
+//			if (StringUtil.isEmpty(boolStr)) {
+//				return;
+//			}
+//			INSTANCE.m_CompatMode = Boolean.valueOf(boolStr);
+//		}
 
 		public static void setServiceInvokeMaxDepth(String depthStr) {
 			if (StringUtil.isEmpty(depthStr)) {

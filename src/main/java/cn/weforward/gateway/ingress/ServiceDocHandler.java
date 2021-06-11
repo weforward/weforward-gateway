@@ -23,9 +23,9 @@ import cn.weforward.common.json.JsonOutputStream;
 import cn.weforward.common.restful.RestfulResponse;
 import cn.weforward.common.util.TransList;
 import cn.weforward.gateway.util.OverloadLimit.OverloadLimitToken;
+import cn.weforward.protocol.aio.ServerContext;
 import cn.weforward.protocol.aio.ServerHandler;
 import cn.weforward.protocol.aio.http.HttpConstants;
-import cn.weforward.protocol.aio.http.HttpContext;
 import cn.weforward.protocol.doc.ServiceDocument;
 import cn.weforward.protocol.serial.JsonSerialEngine;
 import cn.weforward.protocol.support.datatype.SimpleDtList;
@@ -38,18 +38,18 @@ import cn.weforward.protocol.support.doc.ServiceDocumentVo;
  * @author zhangpengji
  *
  */
-public class HttpServiceDoc implements ServerHandler, Runnable {
-	static final Logger _Logger = LoggerFactory.getLogger(HttpServiceDoc.class);
+public class ServiceDocHandler implements ServerHandler, Runnable {
+	static final Logger _Logger = LoggerFactory.getLogger(ServiceDocHandler.class);
 
-	HttpContext m_Context;
+	ServerContext m_Context;
 	ServerHandlerSupporter m_Supporter;
 	volatile OverloadLimitToken m_LimitToken;
 
-	HttpServiceDoc(HttpContext ctx, ServerHandlerSupporter supporter) {
+	ServiceDocHandler(ServerContext ctx, ServerHandlerSupporter supporter) {
 		this(ctx, supporter, null);
 	}
 
-	HttpServiceDoc(HttpContext ctx, ServerHandlerSupporter supporter, OverloadLimitToken token) {
+	ServiceDocHandler(ServerContext ctx, ServerHandlerSupporter supporter, OverloadLimitToken token) {
 		m_Context = ctx;
 		m_Supporter = supporter;
 		m_LimitToken = token;

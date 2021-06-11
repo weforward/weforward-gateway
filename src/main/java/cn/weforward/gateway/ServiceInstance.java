@@ -26,8 +26,6 @@ import cn.weforward.protocol.support.SimpleService;
  *
  */
 public class ServiceInstance extends SimpleService implements ServiceExt {
-	/** FIXME 标识 - 兼容hy模式 */
-	int MARK_HONINYUN_MODE = 0x10000000;
 
 	protected String m_Id;
 	protected String m_NameNo;
@@ -228,18 +226,6 @@ public class ServiceInstance extends SimpleService implements ServiceExt {
 
 	public boolean isMark(int mark) {
 		return mark == (mark & m_Marks);
-	}
-
-	public void setHoninyunMode(boolean bool) {
-		if (bool) {
-			m_Marks |= MARK_HONINYUN_MODE;
-		} else {
-			m_Marks &= (~MARK_HONINYUN_MODE);
-		}
-	}
-
-	public boolean isHoninyunMode() {
-		return isMark(MARK_HONINYUN_MODE);
 	}
 
 	public MeshNode getMeshNode() {

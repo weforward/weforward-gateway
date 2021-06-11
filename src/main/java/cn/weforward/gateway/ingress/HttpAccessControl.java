@@ -17,10 +17,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import cn.weforward.common.util.StringUtil;
+import cn.weforward.protocol.aio.Headers;
+import cn.weforward.protocol.aio.ServerContext;
 import cn.weforward.protocol.aio.ServerHandler;
 import cn.weforward.protocol.aio.http.HttpConstants;
 import cn.weforward.protocol.aio.http.HttpContext;
-import cn.weforward.protocol.aio.http.HttpHeaders;
 
 /**
  * 浏览器跨域控制
@@ -31,15 +32,15 @@ import cn.weforward.protocol.aio.http.HttpHeaders;
 public class HttpAccessControl implements ServerHandler {
 	static final Logger _Logger = LoggerFactory.getLogger(HttpAccessControl.class);
 
-	HttpContext m_Context;
+	ServerContext m_Context;
 
-	public HttpAccessControl(HttpContext ctx) {
+	public HttpAccessControl(ServerContext ctx) {
 		m_Context = ctx;
 	}
 
 	@Override
 	public void requestHeader() {
-		HttpHeaders headers = m_Context.getRequestHeaders();
+		Headers headers = m_Context.getRequestHeaders();
 		if (!StringUtil.isEmpty(headers.get("Access-Control-Request-Method"))) {
 			try {
 				m_Context.setResponseHeader("Access-Control-Allow-Origin", "*");
@@ -71,7 +72,7 @@ public class HttpAccessControl implements ServerHandler {
 	 * @param ctx
 	 * @throws IOException
 	 */
-	public static void outHeaders(HttpContext ctx) throws IOException {
+	public static void outHeaders(ServerContext ctx) throws IOException {
 		// 不限制跨域访问
 		ctx.setResponseHeader("Access-Control-Allow-Origin", "*");
 		// 允许获取headers
