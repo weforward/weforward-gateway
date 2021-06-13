@@ -34,27 +34,27 @@ import cn.weforward.protocol.support.doc.ServiceDocumentVo;
  * @author zhangpengji
  *
  */
-public class SimpleDocument implements ServiceDocument {
+public class SimpleDocumentImpl implements ServiceDocument {
 
 	protected ServiceDocumentVo m_Vo;
 	protected Date m_CreateTime;
 	protected boolean m_LoadFail;
 
-	public SimpleDocument(ServiceDocumentVo vo) {
+	public SimpleDocumentImpl(ServiceDocumentVo vo) {
 		m_Vo = vo;
 		m_CreateTime = new Date();
 	}
 
-	public static SimpleDocument loadFail(Service service, String errorMsg) {
+	public static SimpleDocumentImpl loadFail(Service service, String errorMsg) {
 		return loadFail(service.getName(), service.getVersion(), errorMsg);
 	}
 
-	public static SimpleDocument loadFail(String name, String version, String errorMsg) {
+	public static SimpleDocumentImpl loadFail(String name, String version, String errorMsg) {
 		ServiceDocumentVo vo = new ServiceDocumentVo();
 		vo.name = name;
 		vo.version = version;
 		vo.description = "加载失败：" + errorMsg;
-		SimpleDocument doc = new SimpleDocument(vo);
+		SimpleDocumentImpl doc = new SimpleDocumentImpl(vo);
 		doc.m_LoadFail = true;
 		return doc;
 	}
@@ -184,7 +184,7 @@ public class SimpleDocument implements ServiceDocument {
 		return m_LoadFail;
 	}
 
-	public boolean isLatestThan(SimpleDocument other) {
+	public boolean isLatestThan(SimpleDocumentImpl other) {
 		if (isLoadFail()) {
 			return false;
 		}

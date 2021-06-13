@@ -758,7 +758,7 @@ public class ServiceInstanceBalance {
 			if (1 == eps.length) {
 				ServiceEndpoint ep = eps[0];
 				String ver = StringUtil.toString(ep.getService().getVersion());
-				SimpleDocument doc = getDocumentInCache(ver);
+				SimpleDocumentImpl doc = getDocumentInCache(ver);
 				if (null == doc || doc.isTimeout()) {
 					doc = ep.getDocument();
 					if (null != doc) {
@@ -772,10 +772,10 @@ public class ServiceInstanceBalance {
 				}
 			}
 			// 多实例
-			Map<String, SimpleDocument> docs = new HashMap<String, SimpleDocument>();
+			Map<String, SimpleDocumentImpl> docs = new HashMap<String, SimpleDocumentImpl>();
 			for (ServiceEndpoint ep : eps) {
 				String ver = StringUtil.toString(ep.getService().getVersion());
-				SimpleDocument doc = docs.get(ver);
+				SimpleDocumentImpl doc = docs.get(ver);
 				if (null != doc) {
 					continue;
 				}
@@ -785,7 +785,7 @@ public class ServiceInstanceBalance {
 						// 选最合适的实例加载文档
 						doc = get(null, ver).getDocument();
 					} catch (BalanceException e) {
-						doc = SimpleDocument.loadFail(m_Name, ver, e.getMessage());
+						doc = SimpleDocumentImpl.loadFail(m_Name, ver, e.getMessage());
 					}
 					putDocumentToCache(ver, doc);
 				}
@@ -795,8 +795,8 @@ public class ServiceInstanceBalance {
 		}
 	}
 
-	private SimpleDocument getDocumentInCache(String version) {
-		LruCache<String, SimpleDocument> cache = m_Gateway.getServiceDocCache();
+	private SimpleDocumentImpl getDocumentInCache(String version) {
+		LruCache<String, SimpleDocumentImpl> cache = m_Gateway.getServiceDocCache();
 		if (null == cache) {
 			return null;
 		}
@@ -804,8 +804,8 @@ public class ServiceInstanceBalance {
 		return cache.get(key);
 	}
 
-	private void putDocumentToCache(String version, SimpleDocument doc) {
-		LruCache<String, SimpleDocument> cache = m_Gateway.getServiceDocCache();
+	private void putDocumentToCache(String version, SimpleDocumentImpl doc) {
+		LruCache<String, SimpleDocumentImpl> cache = m_Gateway.getServiceDocCache();
 		if (null == cache) {
 			return;
 		}

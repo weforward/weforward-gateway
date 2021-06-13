@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 
 import cn.weforward.protocol.Request;
 import cn.weforward.protocol.Response;
+import cn.weforward.protocol.aio.ServerContext;
 import cn.weforward.protocol.exception.WeforwardException;
 
 /**
@@ -37,9 +38,10 @@ public interface GatewayApi {
 	 * 调用api的方法
 	 * 
 	 * @param req
+	 * @param context
 	 * @return
 	 * @throws WeforwardException
 	 * @throws GatewayApiException
 	 */
-	Response invoke(Request req);
+	Response invoke(Request req, ServerContext context);
 }

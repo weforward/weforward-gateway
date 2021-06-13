@@ -21,6 +21,7 @@
 		<property name="rpcUri" value="/*" />
 		<property name="docUri" value="/__wf_doc/*" />
 		<property name="streamUri" value="/__wf_stream/" />
+		<property name="webSocketUri" value="/__wf_service_register" />
 		<property name="version" value="true" />
 		<!-- 信任的代理IP -->
 		<property name="proxyIps" value="${proxy.ips:}" />

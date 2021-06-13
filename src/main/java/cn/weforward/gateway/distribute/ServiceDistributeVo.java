@@ -15,24 +15,24 @@ import cn.weforward.gateway.mesh.MeshNodeVo;
 import cn.weforward.protocol.gateway.vo.ServiceExtVo;
 import cn.weforward.protocol.ops.ServiceExt;
 
-public class ServiceInstanceVo extends ServiceExtVo {
+public class ServiceDistributeVo extends ServiceExtVo {
 
 	public MeshNodeVo meshNode;
 
-	public ServiceInstanceVo() {
+	public ServiceDistributeVo() {
 
 	}
 
-	public ServiceInstanceVo(ServiceInstance service) {
+	public ServiceDistributeVo(ServiceInstance service) {
 		super((ServiceExt) service);
 		this.meshNode = MeshNodeVo.valueOf(service.getMeshNode());
 	}
 
-	public static ServiceInstanceVo valueOf(ServiceInstance service) {
+	public static ServiceDistributeVo valueOf(ServiceInstance service) {
 		if (null == service) {
 			return null;
 		}
-		return new ServiceInstanceVo(service);
+		return new ServiceDistributeVo(service);
 	}
 
 	public MeshNodeVo getMeshNode() {

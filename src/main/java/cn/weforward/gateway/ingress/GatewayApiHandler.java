@@ -208,7 +208,7 @@ public class GatewayApiHandler implements ServerHandler, Runnable, Producer.Outp
 
 			// 调用api
 			Response response;
-			response = api.invoke(request);
+			response = api.invoke(request, m_Context);
 			// 检查在api.invoke之后，即便网络中断也执行请求
 			if (SCHEDULE_MARK_ABORT == (SCHEDULE_MARK_ABORT & m_Schedule)) {
 				if (_Logger.isTraceEnabled()) {

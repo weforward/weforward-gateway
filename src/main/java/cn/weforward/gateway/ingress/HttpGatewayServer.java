@@ -96,6 +96,10 @@ public class HttpGatewayServer implements ServerHandlerFactory {
 	public void setStreamUri(String uri) {
 		m_StreamUriPattern = AntPathPattern.valueOf(uri);
 	}
+	
+	public void setWebSocketUri(String uri) {
+		m_Server.setWebSocket(uri);
+	}
 
 	public void setVersion(boolean enabled) {
 		if (enabled) {

@@ -54,7 +54,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 
 /**
- * 微服务实例端点
+ * 微服务实例的端点
  * 
  * @author zhangpengji
  *
@@ -85,7 +85,7 @@ public abstract class ServiceEndpoint extends BalanceElement {
 		if (ListUtil.isEmpty(service.getUrls())) {
 			return null;
 		}
-		return new HttpServiceEndpoint(group, service, rule);
+		return new ServiceEndpointImpl(group, service, rule);
 	}
 
 	void startGauge(String gatewayId, MeterRegistry registry) {
@@ -94,8 +94,8 @@ public abstract class ServiceEndpoint extends BalanceElement {
 				WeforwardMetrics.TagHelper.serviceNo(m_Service.getNo()));
 		Gauge.builder(WeforwardMetrics.GATEWAY_SERVICE_RPC_COUNT, this, ServiceEndpoint::getTimes).tags(tags)
 				.register(registry);
-		Gauge.builder(WeforwardMetrics.GATEWAY_SERVICE_RPC_CONCURRENT, this, ServiceEndpoint::getConcurrent)
-				.tags(tags).register(registry);
+		Gauge.builder(WeforwardMetrics.GATEWAY_SERVICE_RPC_CONCURRENT, this, ServiceEndpoint::getConcurrent).tags(tags)
+				.register(registry);
 		Gauge.builder(WeforwardMetrics.GATEWAY_SERVICE_RPC_FAIL, this, ServiceEndpoint::getFailTotal).tags(tags)
 				.register(registry);
 	}
@@ -124,7 +124,7 @@ public abstract class ServiceEndpoint extends BalanceElement {
 	Access getValidAccess(String accessId) {
 		return m_Balance.getValidAccess(accessId);
 	}
-	
+
 	Access getInternalAccess() {
 		return m_Balance.getInternalAccess();
 	}
@@ -183,6 +183,9 @@ public abstract class ServiceEndpoint extends BalanceElement {
 		if (!url1.equals(url2)) {
 			return false;
 		}
+		if(s1.getClientChannel() != s2.getClientChannel()) {
+			return false;
+		}
 		// 若所在网格变了，编号、链接应该都变了，故省略以下判断
 		// if(!StringUtil.eq(s1.getMeshNodeId(), s2.getMeshNodeId())) {
 		// return false;
@@ -222,7 +225,7 @@ public abstract class ServiceEndpoint extends BalanceElement {
 		}
 		return nos.contains(m_Service.getNo());
 	}
-	
+
 	boolean isSelfMesh() {
 		return m_Service.isSelfMesh();
 	}
@@ -231,13 +234,12 @@ public abstract class ServiceEndpoint extends BalanceElement {
 	 * 与微服务端建立连接
 	 * 
 	 * @param tunnel
-	 * @param supportForward
-	 *            是否支持转发
+	 * @param supportForward 是否支持转发
 	 */
 	public Pipe connect(Tunnel tunnel, boolean supportForward) {
 		return openPipe(tunnel, supportForward);
 	}
-	
+
 	protected ServiceTraceToken createTraceToken(Tunnel tunnel) {
 		ServiceTracer tracer = m_Balance.getServiceTracer();
 		return tracer.onBegin(tunnel.getTraceToken(), getService());
@@ -249,8 +251,7 @@ public abstract class ServiceEndpoint extends BalanceElement {
 	 * 与微服务端建立连接
 	 * 
 	 * @param tunnel
-	 * @param supportForward
-	 *            是否支持转发
+	 * @param supportForward 是否支持转发
 	 */
 	public StreamPipe connect(StreamTunnel tunnel) {
 		return openPipe(tunnel);
@@ -312,7 +313,7 @@ public abstract class ServiceEndpoint extends BalanceElement {
 		return false;
 	}
 
-	SimpleDocument getDocument() {
+	SimpleDocumentImpl getDocument() {
 		ServiceInstance service = getService();
 		String name = service.getName();
 		String method = service.getDocumentMethod();
@@ -332,19 +333,19 @@ public abstract class ServiceEndpoint extends BalanceElement {
 			if (0 != code) {
 				String errMsg = code + "/" + tunnel.getMsg();
 				_Logger.warn("微服务[" + toStringNameNo() + "]获取文档出错：" + errMsg);
-				return SimpleDocument.loadFail(service, errMsg);
+				return SimpleDocumentImpl.loadFail(service, errMsg);
 			}
 			result = FriendlyObject.valueOf(tunnel.getResult());
 		} catch (Throwable e) {
 			String errMsg = "微服务[" + toStringNameNo() + "]获取文档出错";
 			_Logger.warn(errMsg, e);
-			return SimpleDocument.loadFail(service, e.toString());
+			return SimpleDocumentImpl.loadFail(service, e.toString());
 		}
 		int resultCode = result.getInt("code", 0);
 		if (0 != resultCode) {
 			String errMsg = resultCode + "/" + result.getString("msg");
 			_Logger.warn("微服务[" + toStringNameNo() + "]获取文档出错：" + errMsg);
-			return SimpleDocument.loadFail(service, errMsg);
+			return SimpleDocumentImpl.loadFail(service, errMsg);
 		}
 		DtObject resultContent = result.getObject("content");
 		if (null == resultContent) {
@@ -356,9 +357,9 @@ public abstract class ServiceEndpoint extends BalanceElement {
 		} catch (Exception e) {
 			String errMsg = "微服务[" + toStringNameNo() + "]解析文档出错";
 			_Logger.error(errMsg, e);
-			return SimpleDocument.loadFail(service, errMsg);
+			return SimpleDocumentImpl.loadFail(service, errMsg);
 		}
-		return new SimpleDocument(vo);
+		return new SimpleDocumentImpl(vo);
 	}
 
 	DtObject debug(String source, String name, String args) throws DebugServiceException {

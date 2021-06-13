@@ -18,6 +18,7 @@ import cn.weforward.protocol.Header;
 import cn.weforward.protocol.Request;
 import cn.weforward.protocol.RequestConstants;
 import cn.weforward.protocol.Response;
+import cn.weforward.protocol.aio.ServerContext;
 import cn.weforward.protocol.client.ext.ResponseResultMapper;
 import cn.weforward.protocol.client.ext.ResponseResultObject;
 import cn.weforward.protocol.datatype.DtObject;
@@ -59,7 +60,7 @@ abstract class AbstractGatewayApi implements GatewayApi {
 	}
 
 	@Override
-	public Response invoke(Request req) {
+	public Response invoke(Request req, ServerContext context) {
 		Header header = req.getHeader();
 		FriendlyObject invokeObj = new FriendlyObject(req.getServiceInvoke());
 		String methodName = invokeObj.getString(RequestConstants.METHOD);
@@ -69,7 +70,7 @@ abstract class AbstractGatewayApi implements GatewayApi {
 			result = ResponseResultObject.error(CommonServiceCodes.METHOD_NOT_FOUND, "方法不存在:" + methodName);
 		} else {
 			try {
-				Object content = method.executeMethod(header, invokeObj.getFriendlyObject(RequestConstants.PARAMS));
+				Object content = method.executeMethod(header, invokeObj.getFriendlyObject(RequestConstants.PARAMS), context);
 				result = ResponseResultObject.success(content);
 			} catch (ApiException e) {
 				result = ResponseResultObject.error(e.code, e.msg);

@@ -51,6 +51,7 @@ import cn.weforward.gateway.util.ServiceNameMatcher;
 import cn.weforward.metrics.WeforwardMetrics;
 import cn.weforward.protocol.Header;
 import cn.weforward.protocol.Service;
+import cn.weforward.protocol.aio.ClientChannel;
 import cn.weforward.protocol.aio.netty.NettyHttpClientFactory;
 import cn.weforward.protocol.datatype.DtObject;
 import cn.weforward.protocol.doc.ServiceDocument;
@@ -98,7 +99,7 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 	// 已注册的微服务监听器
 	private List<ServiceListener> m_ServiceListeners;
 	// 微服务文档缓存
-	private LruCache<String, SimpleDocument> m_ServiceDocCache;
+	private LruCache<String, SimpleDocumentImpl> m_ServiceDocCache;
 	// 是否已就绪
 	private boolean m_Ready;
 	// NettyHttpClient工厂
@@ -321,8 +322,9 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 	}
 
 	@Override
-	public void registerService(String ownerAccessId, Service info, ServiceRuntime runtime) {
+	public void registerService(String ownerAccessId, Service info, ServiceRuntime runtime, ClientChannel clientChannel) {
 		ServiceInstance service = new ServiceInstance(info, ownerAccessId, new Date());
+		service.setClientChannel(clientChannel);
 		registerServiceInner(service, false);
 
 		gaugeServiceRuntime(service, runtime);
@@ -635,7 +637,7 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 		}
 	}
 
-	public LruCache<String, SimpleDocument> getServiceDocCache() {
+	public LruCache<String, SimpleDocumentImpl> getServiceDocCache() {
 		return m_ServiceDocCache;
 	}
 

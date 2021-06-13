@@ -28,8 +28,8 @@ public class ServiceInstanceMapper implements ObjectMapper<ServiceInstance> {
 
 	@Override
 	public DtObject toDtObject(ServiceInstance service) throws ObjectMappingException {
-		ServiceInstanceVo vo = ServiceInstanceVo.valueOf(service);
-		BeanObjectMapper<ServiceInstanceVo> mapper = BeanObjectMapper.getInstance(ServiceInstanceVo.class);
+		ServiceDistributeVo vo = ServiceDistributeVo.valueOf(service);
+		BeanObjectMapper<ServiceDistributeVo> mapper = BeanObjectMapper.getInstance(ServiceDistributeVo.class);
 		return mapper.toDtObject(vo);
 	}
 
@@ -40,8 +40,8 @@ public class ServiceInstanceMapper implements ObjectMapper<ServiceInstance> {
 
 	@Override
 	public ServiceInstance fromDtObject(DtObject obj) throws ObjectMappingException {
-		BeanObjectMapper<ServiceInstanceVo> mapper = BeanObjectMapper.getInstance(ServiceInstanceVo.class);
-		ServiceInstanceVo vo = mapper.fromDtObject(obj);
+		BeanObjectMapper<ServiceDistributeVo> mapper = BeanObjectMapper.getInstance(ServiceDistributeVo.class);
+		ServiceDistributeVo vo = mapper.fromDtObject(obj);
 		ServiceInstance serviceInstance = new ServiceInstance(new ServiceExtWrap(vo));
 		if (null != vo.meshNode) {
 			serviceInstance.setMeshNode(new MeshNodeWrap(vo.meshNode));

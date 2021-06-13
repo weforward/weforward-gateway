@@ -17,6 +17,10 @@ import cn.weforward.gateway.Configure;
 import cn.weforward.gateway.GatewayExt;
 import cn.weforward.protocol.Header;
 import cn.weforward.protocol.ServiceName;
+import cn.weforward.protocol.aio.ClientChannel;
+import cn.weforward.protocol.aio.ServerBackwardChannel;
+import cn.weforward.protocol.aio.ServerContext;
+import cn.weforward.protocol.exception.WeforwardException;
 import cn.weforward.protocol.gateway.vo.ServiceVo;
 import cn.weforward.protocol.support.BeanObjectMapper;
 import cn.weforward.protocol.support.CommonServiceCodes;
@@ -68,13 +72,22 @@ class ServiceRegisterApi extends AbstractGatewayApi {
 	private ApiMethod register = new ApiMethod("register") {
 
 		@Override
-		Void execute(Header reqHeader, FriendlyObject params) throws ApiException {
+		Object execute(Header header, FriendlyObject params) throws ApiException, WeforwardException {
+			throw new ApiException(CommonServiceCodes.INTERNAL_ERROR.code, "未实现");
+		}
+
+		@Override
+		Void execute(Header reqHeader, FriendlyObject params, ServerContext context) throws ApiException {
 			ServiceVo info = params.toObject(ServiceVo.class, m_Mappers);
 			String errorMsg = checkService(info);
 			if (!StringUtil.isEmpty(errorMsg)) {
 				throw new ApiException(CommonServiceCodes.ILLEGAL_ARGUMENT.code, errorMsg);
 			}
-			m_Gateway.registerService(reqHeader.getAccessId(), info, info.serviceRuntime);
+			ClientChannel channel = null;
+			if(context instanceof ServerBackwardChannel) {
+				channel = ((ServerBackwardChannel) context).getClientChannel();
+			}
+			m_Gateway.registerService(reqHeader.getAccessId(), info, info.serviceRuntime, channel);
 			return null;
 		}
 	};
@@ -92,7 +105,7 @@ class ServiceRegisterApi extends AbstractGatewayApi {
 			return null;
 		}
 	};
-	
+
 	private ApiMethod listServiceName = new ApiMethod("list_service_name", true) {
 
 		@Override

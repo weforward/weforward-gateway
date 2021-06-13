@@ -13,6 +13,7 @@ package cn.weforward.gateway;
 import cn.weforward.common.ResultPage;
 import cn.weforward.protocol.RequestConstants;
 import cn.weforward.protocol.Service;
+import cn.weforward.protocol.aio.ClientChannel;
 import cn.weforward.protocol.exception.UnReadyException;
 import cn.weforward.protocol.ext.ServiceRuntime;
 
@@ -27,22 +28,18 @@ public interface Gateway {
 	/**
 	 * 注册一个微服务
 	 * 
-	 * @param ownerAccessId
-	 *            服务所有者的Access Id
-	 * @param info
-	 *            服务信息
-	 * @param runtime
-	 *            服务运行时信息
+	 * @param ownerAccessId 服务所有者的Access Id
+	 * @param info          服务信息
+	 * @param runtime       服务运行时信息
+	 * @param clientChannel       客户端通道
 	 */
-	void registerService(String ownerAccessId, Service service, ServiceRuntime runtime);
+	void registerService(String ownerAccessId, Service service, ServiceRuntime runtime, ClientChannel clientChannel);
 
 	/**
 	 * 注销一个微服务
 	 * 
-	 * @param ownerAccessId
-	 *            服务所有者的Access Id
-	 * @param info
-	 *            服务信息
+	 * @param ownerAccessId 服务所有者的Access Id
+	 * @param info          服务信息
 	 */
 	void unregisterService(String ownerAccessId, Service service);
 
@@ -67,8 +64,7 @@ public interface Gateway {
 	/**
 	 * 列举微服务名称
 	 * 
-	 * @param keyword
-	 *            名称关键字，支持通配符'*'，如：*_order,*.pay,us*er
+	 * @param keyword 名称关键字，支持通配符'*'，如：*_order,*.pay,us*er
 	 * @return
 	 */
 	ResultPage<String> listServiceName(String keyword);
@@ -78,8 +74,7 @@ public interface Gateway {
 	 * <p>
 	 * 支持按名称模糊搜索
 	 * 
-	 * @param name
-	 *            服务名称，可空
+	 * @param name 服务名称，可空
 	 * @return
 	 */
 	ResultPage<ServiceInstance> listService(String name);

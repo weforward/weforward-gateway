@@ -46,13 +46,13 @@ import cn.weforward.protocol.AccessLoader;
 import cn.weforward.protocol.Header;
 import cn.weforward.protocol.Header.HeaderOutput;
 import cn.weforward.protocol.Response;
+import cn.weforward.protocol.aio.ClientChannel;
+import cn.weforward.protocol.aio.ClientContext;
 import cn.weforward.protocol.aio.ClientHandler;
+import cn.weforward.protocol.aio.Headers;
 import cn.weforward.protocol.aio.http.HttpConstants;
 import cn.weforward.protocol.aio.http.HttpHeaderHelper;
 import cn.weforward.protocol.aio.http.HttpHeaderOutput;
-import cn.weforward.protocol.aio.http.HttpHeaders;
-import cn.weforward.protocol.aio.netty.NettyHttpClient;
-import cn.weforward.protocol.aio.netty.NettyHttpClientFactory;
 import cn.weforward.protocol.auth.AuthExceptionWrap;
 import cn.weforward.protocol.auth.AutherOutputStream;
 import cn.weforward.protocol.exception.AuthException;
@@ -61,12 +61,12 @@ import cn.weforward.protocol.ops.trace.ServiceTraceToken;
 import cn.weforward.protocol.ops.traffic.TrafficTableItem;
 
 /**
- * 使用Http协议对接微服务端点的实现
+ * 微服务端点的实现
  * 
  * @author zhangpengji
  *
  */
-public class HttpServiceEndpoint extends ServiceEndpoint {
+public class ServiceEndpointImpl extends ServiceEndpoint {
 
 	// @SuppressWarnings("serial")
 	// static final IOException REQUEST_ABORT = new IOException("请求中断") {
@@ -77,7 +77,7 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 
 	List<EndpointUrl> m_EndpointUrls;
 
-	public HttpServiceEndpoint(ServiceInstanceBalance group, ServiceInstance service, TrafficTableItem rule) {
+	public ServiceEndpointImpl(ServiceInstanceBalance group, ServiceInstance service, TrafficTableItem rule) {
 		super(group, service, rule);
 		initUrls();
 	}
@@ -116,7 +116,11 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 			ServiceTraceToken token = createTraceToken(tunnel);
 			pipe = new EndpointPipe(tunnel, getEndpointUrl(), getService(), token, supportForward);
 		}
-		pipe.open(getHttpClientFactory(), m_ReadTimeout);
+		ClientChannel channel = m_Service.getClientChannel();
+		if(null == channel) {
+			channel = getHttpClientFactory();
+		}
+		pipe.open(channel, m_ReadTimeout);
 		return pipe;
 	}
 
@@ -167,11 +171,11 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 		output.put(name, value);
 	}
 
-	protected void readHeader(HttpHeaders hs, Header header) {
+	protected void readHeader(Headers hs, Header header) {
 		HttpHeaderHelper.fromHttpHeaders(hs, header);
 	}
 
-	protected String readHeader(HttpHeaders hs, String name) {
+	protected String readHeader(Headers hs, String name) {
 		return hs.getHeaderRaw(name);
 	}
 
@@ -204,7 +208,7 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 		Access m_Access;
 		int m_PreparedSize;
 
-		NettyHttpClient m_Invoker;
+		ClientContext m_Context;
 		// 当前进度
 		volatile int m_Schedule;
 		// 请求输出流（输出到服务端）
@@ -234,18 +238,18 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 
 		// 初始化依赖
 		void init() {
-			m_Trust = HttpServiceEndpoint.this.isTrust();
-			m_Access = HttpServiceEndpoint.this.getValidAccess(m_Service.getOwner());
+			m_Trust = ServiceEndpointImpl.this.isTrust();
+			m_Access = ServiceEndpointImpl.this.getValidAccess(m_Service.getOwner());
 			m_PreparedSize = Configure.getInstance().getWfRespPreparedSize();
 		}
 
-		void open(NettyHttpClientFactory factory, int timeout) {
-			m_Invoker = factory.open(this);
-
+		void open(ClientChannel channel, int timeout) {
 			int waitTimeout = m_Tunnel.getWaitTimeout();
 			if (waitTimeout > 0) {
-				if (waitTimeout > 5) {
+				if (waitTimeout >= 5) {
 					waitTimeout -= 2;
+				} else if (waitTimeout >= 3) {
+					waitTimeout -= 1;
 				}
 				timeout = waitTimeout;
 			}
@@ -253,8 +257,9 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 				timeout = Configure.getInstance().getServiceMaxReadTimeout();
 			}
 			try {
-				m_Invoker.request(m_Url.url, HttpConstants.METHOD_POST, timeout * 1000);
-			} catch (IOException e) {
+				m_Context = channel.request(this, m_Url.url, HttpConstants.METHOD_POST);
+				m_Context.setTimeout(timeout * 1000);
+			} catch (Exception e) {
 				m_Url.fail();
 				responseError(e);
 			}
@@ -375,7 +380,7 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 				AutherOutputStream auther = AutherOutputStream.getInstance(authType);
 				auther.init(AutherOutputStream.MODE_ENCODE, this, m_Trust);
 				auther.auth(header);
-				m_RequestOutput = m_Invoker.openRequestWriter();
+				m_RequestOutput = m_Context.openRequestWriter();
 				auther.setTransferTo(this, m_RequestOutput);
 				m_RequestOutputAuther = auther;
 				// 输出wf_req
@@ -448,10 +453,10 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 			// return;
 			// }
 			try {
-				HttpHeaders hs;
-				hs = m_Invoker.getResponseHeaders();
+				Headers hs;
+				hs = m_Context.getResponseHeaders();
 				Header header = new Header(getService().getName());
-				HttpServiceEndpoint.this.readHeader(hs, header);
+				ServiceEndpointImpl.this.readHeader(hs, header);
 				String authType = header.getAuthType();
 				if (StringUtil.isEmpty(authType)) {
 					responseError(WeforwardException.CODE_AUTH_TYPE_INVALID, "验证错误，响应缺少auth_type");
@@ -491,8 +496,8 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 			checkTunnel(tunnel);
 
 			end(BalanceElement.STATE_OK);
-			if (null != m_Invoker) {
-				m_Invoker.disconnect();
+			if (null != m_Context) {
+				m_Context.disconnect();
 			}
 		}
 
@@ -543,9 +548,9 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 			JsonInput jsonInput = null;
 			WfResp wfResp;
 			try {
-				responseInput = m_Invoker.duplicateResponseStream();
+				responseInput = m_Context.duplicateResponseStream();
 				jsonInput = new JsonInputStream(responseInput, m_Header.getCharset());
-				wfResp = HttpServiceEndpoint.this.createWfResp();
+				wfResp = ServiceEndpointImpl.this.createWfResp();
 				try {
 					JsonUtil.parse(jsonInput, wfResp);
 				} catch (JsonParseAbort e) {
@@ -612,12 +617,12 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 		}
 
 		void dumpResponse() {
-			if (!HttpServiceEndpoint._Logger.isTraceEnabled()) {
+			if (!ServiceEndpointImpl._Logger.isTraceEnabled()) {
 				return;
 			}
 			InputStream in = null;
 			try {
-				in = m_Invoker.duplicateResponseStream();
+				in = m_Context.duplicateResponseStream();
 				String charset = m_Header.getCharset();
 				BytesOutputStream bos = new BytesOutputStream(in);
 				Bytes bytes = bos.getBytes();
@@ -641,10 +646,10 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 			try {
 				// output = m_Tunnel.getOutput();
 				// 先补充验证原先wf_resp部分
-				preparedStream = m_Invoker.duplicateResponseStream();
+				preparedStream = m_Context.duplicateResponseStream();
 				m_ResponseInputAuther.write(preparedStream, m_WfResp.nextPosition);
 				m_ResponseInputAuther.setTransferTo(null, output);
-				m_Invoker.responseTransferTo(m_ResponseInputAuther, m_WfResp.nextPosition);
+				m_Context.responseTransferTo(m_ResponseInputAuther, m_WfResp.nextPosition);
 			} catch (Throwable e) {
 				responseError(e);
 				return;
@@ -655,7 +660,7 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 			synchronized (this) {
 				m_Schedule = SCHEDULE_RESPONSE_TRANSFERED;
 			}
-			if (m_Invoker.isResponseCompleted()) {
+			if (m_Context.isResponseCompleted()) {
 				responseCompleted0();
 			}
 		}
@@ -681,7 +686,7 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 				m_Tunnel.responseCompleted(this);
 			} finally {
 				end(BalanceElement.STATE_OK);
-				m_Invoker.close();
+				m_Context.close();
 			}
 		}
 
@@ -699,7 +704,7 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 		}
 
 		void responseError(Throwable e) {
-			HttpServiceEndpoint._Logger.error(e.toString(), e);
+			ServiceEndpointImpl._Logger.error(e.toString(), e);
 			int code;
 			String msg;
 			int state = BalanceElement.STATE_EXCEPTION;
@@ -744,7 +749,7 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 			} finally {
 				end(state);
 				StringBuilderPool._8k.offer(sb);
-				m_Invoker.disconnect();
+				m_Context.disconnect();
 			}
 		}
 
@@ -755,7 +760,7 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 				}
 				m_Schedule = SCHEDULE_END;
 			}
-			HttpServiceEndpoint.this.end(this, state, m_TraceToken);
+			ServiceEndpointImpl.this.end(this, state, m_TraceToken);
 		}
 
 		// ------------ 以下是ClientHandler的实现
@@ -772,14 +777,21 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 		}
 
 		@Override
-		public void established() {
+		public void established(ClientContext context) {
 			if (_Logger.isTraceEnabled()) {
 				_Logger.trace(getService().getName() + " established.");
+			}
+			if (null == m_Context) {
+				// websocket会在ClientChannel.request中，回调此接口
+				m_Context = context;
+			} else if (m_Context != context) {
+				// 不会吧，什么情况！？
+				_Logger.error("context不一致：" + m_Context + " != " + context);
 			}
 			m_Url.success();
 
 			try {
-				HttpServiceEndpoint.this.getRpcExecutor().execute(this);
+				ServiceEndpointImpl.this.getRpcExecutor().execute(this);
 			} catch (RejectedExecutionException e) {
 				responseError(WeforwardException.CODE_GATEWAY_BUSY, "网关忙", BalanceElement.STATE_OK);
 			}
@@ -813,7 +825,7 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 			// 检查状态码
 			int code;
 			try {
-				code = m_Invoker.getResponseCode();
+				code = m_Context.getResponseCode();
 			} catch (Throwable e) {
 				responseError(e);
 				return;
@@ -879,14 +891,14 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 
 		@Override
 		public void writeHeader(Header header) throws IOException {
-			HttpServiceEndpoint.this.writeHeader(this, header);
+			ServiceEndpointImpl.this.writeHeader(this, header);
 		}
 
 		// ------------ 以下是HttpHeaderOutput的实现
 
 		@Override
 		public void put(String name, String value) throws IOException {
-			m_Invoker.setRequestHeader(name, value);
+			m_Context.setRequestHeader(name, value);
 		}
 
 		// ------------ 以下是AccessLoader的实现
@@ -933,7 +945,7 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 
 				Header header = m_Tunnel.getHeader();
 				writeHeader(header);
-				m_RequestOutput = m_Invoker.openRequestWriter();
+				m_RequestOutput = m_Context.openRequestWriter();
 			} catch (Throwable e) {
 				responseError(e);
 				return;
@@ -950,10 +962,10 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 				m_Schedule = SCHEDULE_PARES_RESP_HEADER;
 			}
 			try {
-				HttpHeaders hs;
-				hs = m_Invoker.getResponseHeaders();
+				Headers hs;
+				hs = m_Context.getResponseHeaders();
 				Header header = new Header(getService().getName());
-				HttpServiceEndpoint.this.readHeader(hs, header);
+				ServiceEndpointImpl.this.readHeader(hs, header);
 				m_Header = header;
 			} catch (Throwable e) {
 				responseError(e);
@@ -978,7 +990,7 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 			checkTunnel(tunnel);
 
 			try {
-				m_Invoker.responseTransferTo(output, 0);
+				m_Context.responseTransferTo(output, 0);
 			} catch (Throwable e) {
 				responseError(e);
 				return;
@@ -987,7 +999,7 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 			synchronized (this) {
 				m_Schedule = SCHEDULE_RESPONSE_TRANSFERED;
 			}
-			if (m_Invoker.isResponseCompleted()) {
+			if (m_Context.isResponseCompleted()) {
 				responseCompleted0();
 			}
 		}
@@ -1008,7 +1020,7 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 		EndpointUrl m_Url;
 		ServiceInstance m_Service;
 
-		NettyHttpClient m_Invoker;
+		ClientContext m_Context;
 		// 当前进度
 		volatile int m_Schedule;
 		// 请求输出流
@@ -1023,12 +1035,12 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 			m_Service = service;
 		}
 
-		void open(NettyHttpClientFactory factory, int timeout) {
-			m_Invoker = factory.open(this);
+		void open(ClientChannel channel, int timeout) {
 			try {
 				String id = URLEncoder.encode(m_Tunnel.getResourceId(), Header.CHARSET_DEFAULT);
 				String url = m_Url.url + "?id=" + id;
-				m_Invoker.request(url, HttpConstants.METHOD_POST, timeout * 1000);
+				m_Context = channel.request(this, url, HttpConstants.METHOD_POST);
+				m_Context.setTimeout(timeout * 1000);
 			} catch (IOException e) {
 				m_Url.fail();
 				responseError(e);
@@ -1072,7 +1084,7 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 					writeHeader(this, HttpConstants.CONTENT_LENGTH, String.valueOf(length));
 				}
 				/* 转发请求内容 */
-				m_Output = m_Invoker.openRequestWriter();
+				m_Output = m_Context.openRequestWriter();
 				m_Tunnel.requestReady(this, m_Output);
 			} catch (Throwable e) {
 				responseError(e);
@@ -1091,8 +1103,8 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 			checkTunnel(tunnel);
 
 			end(BalanceElement.STATE_OK);
-			if (null != m_Invoker) {
-				m_Invoker.disconnect();
+			if (null != m_Context) {
+				m_Context.disconnect();
 			}
 		}
 
@@ -1118,10 +1130,10 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 				m_Schedule = SCHEDULE_RESPONSE_READY;
 			}
 			int respCode;
-			HttpHeaders headers;
+			Headers headers;
 			try {
-				respCode = m_Invoker.getResponseCode();
-				headers = m_Invoker.getResponseHeaders();
+				respCode = m_Context.getResponseCode();
+				headers = m_Context.getResponseHeaders();
 			} catch (Throwable e) {
 				responseError(e);
 				return;
@@ -1143,7 +1155,7 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 		@Override
 		public void responseReady(StreamTunnel tunnel, OutputStream output) {
 			try {
-				m_Invoker.responseTransferTo(output, 0);
+				m_Context.responseTransferTo(output, 0);
 			} catch (Throwable e) {
 				responseError(e);
 				return;
@@ -1152,7 +1164,7 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 			synchronized (this) {
 				m_Schedule = SCHEDULE_RESPONSE_TRANSFERED;
 			}
-			if (m_Invoker.isResponseCompleted()) {
+			if (m_Context.isResponseCompleted()) {
 				responseCompleted0();
 			}
 		}
@@ -1168,7 +1180,7 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 				m_Tunnel.responseCompleted(this);
 			} finally {
 				end(BalanceElement.STATE_OK);
-				m_Invoker.close();
+				m_Context.close();
 			}
 
 		}
@@ -1212,7 +1224,7 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 				m_Tunnel.responseError(this, code, sb.toString());
 			} finally {
 				end(state);
-				m_Invoker.disconnect();
+				m_Context.disconnect();
 			}
 
 		}
@@ -1234,7 +1246,7 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 				}
 			}
 
-			HttpServiceEndpoint.this.end(this, state);
+			ServiceEndpointImpl.this.end(this, state);
 		}
 
 		// ------------ 以下是ClientHandler的实现
@@ -1250,9 +1262,13 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 		}
 
 		@Override
-		public void established() {
+		public void established(ClientContext context) {
 			if (_Logger.isTraceEnabled()) {
 				_Logger.trace(getService().getName() + " established.");
+			}
+			if (m_Context != context) {
+				// 不会吧，什么情况！？
+				_Logger.error("context不一致：" + m_Context + " != " + context);
 			}
 			m_Url.success();
 
@@ -1320,7 +1336,7 @@ public class HttpServiceEndpoint extends ServiceEndpoint {
 
 		@Override
 		public void put(String name, String value) throws IOException {
-			m_Invoker.setRequestHeader(name, value);
+			m_Context.setRequestHeader(name, value);
 		}
 
 	}

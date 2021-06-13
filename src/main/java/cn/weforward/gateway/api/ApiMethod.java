@@ -11,6 +11,7 @@
 package cn.weforward.gateway.api;
 
 import cn.weforward.protocol.Header;
+import cn.weforward.protocol.aio.ServerContext;
 import cn.weforward.protocol.client.ext.ResponseResultObject;
 import cn.weforward.protocol.exception.WeforwardException;
 import cn.weforward.protocol.support.CommonServiceCodes;
@@ -40,12 +41,19 @@ abstract class ApiMethod {
 		return m_Name;
 	}
 
-	Object executeMethod(Header header, FriendlyObject params) throws ApiException, WeforwardException {
+	Object executeMethod(Header header, FriendlyObject params, ServerContext context)
+			throws ApiException, WeforwardException {
 		if (!m_WithoutParams && null == params) {
 			return ResponseResultObject.error(CommonServiceCodes.ILLEGAL_ARGUMENT, "params不能为空");
 		}
-		return execute(header, params);
+		return execute(header, params, context);
 	}
 
 	abstract Object execute(Header header, FriendlyObject params) throws ApiException, WeforwardException;
+
+	Object execute(Header header, FriendlyObject params, ServerContext context)
+			throws ApiException, WeforwardException {
+		// 子类重载
+		return execute(header, params);
+	}
 }

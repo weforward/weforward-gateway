@@ -10,14 +10,15 @@
  */
 package cn.weforward.gateway;
 
+import java.util.Collections;
 import java.util.Date;
+import java.util.List;
 
-import javax.annotation.Resource;
-
+import cn.weforward.common.util.ListUtil;
 import cn.weforward.common.util.StringUtil;
 import cn.weforward.protocol.Service;
+import cn.weforward.protocol.aio.ClientChannel;
 import cn.weforward.protocol.ops.ServiceExt;
-import cn.weforward.protocol.support.SimpleService;
 
 /**
  * 网关中的微服务实例
@@ -25,26 +26,60 @@ import cn.weforward.protocol.support.SimpleService;
  * @author zhangpengji
  *
  */
-public class ServiceInstance extends SimpleService implements ServiceExt {
+public class ServiceInstance implements ServiceExt {
 
 	protected String m_Id;
 	protected String m_NameNo;
 
+	/** @see #getName() */
+	protected String m_Name;
+	/** @see #getDomain() */
+	protected String m_Domain;
+	/** @see #getPort() */
+	protected int m_Port;
+	/** @see #getUrls() */
+	protected List<String> m_Urls;
+	/** @see #getNo() */
+	protected String m_No;
+	/** @see #getVersion() */
+	protected String m_Version;
+	/** @see #getCompatibleVersion() */
+	protected String m_CompatibleVersion;
+	/** @see #getHeartbeatPeriod() */
+	protected int m_HeartbeatPeriod;
+	/** @see #getBuildVersion() */
+	protected String m_BuildVersion;
+	/** @see #getNote() */
+	protected String m_Note;
+	/** @see #getDocumentMethod() */
+	protected String m_DocumentMethod;
+	/** @see #getDebugMethod() */
+	protected String m_DebugMethod;
+	/** @see #getRunningId() */
+	protected String m_RunningId;
+	/** @see #getRequestMaxSize() */
+	protected int m_RequestMaxSize;
+	/** @see #getMarks() */
+	protected int m_Marks;
+
 	/** @see #getOwner() */
-	@Resource
 	protected String m_Owner;
 	/** @see #getHeartbeat() */
-	@Resource
 	protected Date m_Heartbeat;
 	/** @see #getState() */
-	@Resource
 	protected int m_State;
+
 	/** 所在的网格 */
-	@Resource
 	protected MeshNode m_MeshNode;
 
+	/**
+	 * 与网关通信的channel。<br/>
+	 * 当不为空时，表示实例只能由当前网关通过此Channel通信
+	 */
+	protected ClientChannel m_ClientChannel;
+
 	public ServiceInstance(Service service, String owner, Date heartbeat) {
-		super(service);
+		init(service);
 		setOwner(owner);
 		setHeartbeat(heartbeat);
 	}
@@ -55,7 +90,7 @@ public class ServiceInstance extends SimpleService implements ServiceExt {
 	 * @param foreign
 	 */
 	public ServiceInstance(ServiceExt foreign) {
-		super(foreign);
+		init(foreign);
 		m_Owner = foreign.getOwner();
 		m_Heartbeat = foreign.getHeartbeat();
 		// m_State = service.getState(); 略过状态
@@ -67,8 +102,32 @@ public class ServiceInstance extends SimpleService implements ServiceExt {
 	 * @param foreign
 	 */
 	public ServiceInstance(ServiceInstance foreign) {
-		this((ServiceExt) foreign);
+		init((ServiceExt) foreign);
 		m_MeshNode = foreign.getMeshNode();
+	}
+
+	protected void init(Service service) {
+		m_Name = service.getName();
+		m_Domain = service.getDomain();
+		m_Port = service.getPort();
+		m_Urls = service.getUrls();
+		if (ListUtil.isEmpty(m_Urls)) {
+			if (!StringUtil.isEmpty(m_Domain) && m_Port > 0) {
+				String url = "http://" + m_Domain + ":" + m_Port + "/" + m_Name;
+				m_Urls = Collections.singletonList(url);
+			}
+		}
+		m_No = service.getNo();
+		m_Version = service.getVersion();
+		m_CompatibleVersion = service.getCompatibleVersion();
+		m_BuildVersion = service.getBuildVersion();
+		m_HeartbeatPeriod = service.getHeartbeatPeriod();
+		m_Note = service.getNote();
+		m_DocumentMethod = service.getDocumentMethod();
+		m_RunningId = service.getRunningId();
+		m_RequestMaxSize = service.getRequestMaxSize();
+		m_Marks = service.getMarks();
+		m_DebugMethod = service.getDebugMethod();
 	}
 
 	// public static ServiceInstance valueOf(ServiceExt service) {
@@ -80,6 +139,116 @@ public class ServiceInstance extends SimpleService implements ServiceExt {
 	// }
 	// return new ServiceInstance(service);
 	// }
+
+	@Override
+	public String getName() {
+		return m_Name;
+	}
+
+	@Override
+	public List<String> getUrls() {
+		return m_Urls;
+	}
+
+	@Override
+	public String getNo() {
+		return m_No;
+	}
+
+	@Override
+	public String getVersion() {
+		return m_Version;
+	}
+
+	@Override
+	public String getCompatibleVersion() {
+		return m_CompatibleVersion;
+	}
+
+	@Override
+	public String getBuildVersion() {
+		return m_BuildVersion;
+	}
+
+	@Override
+	public String getNote() {
+		return m_Note;
+	}
+
+	@Override
+	public String getDocumentMethod() {
+		return m_DocumentMethod;
+	}
+
+	@Override
+	public String getRunningId() {
+		return m_RunningId;
+	}
+
+	public void setName(String name) {
+		m_Name = name;
+	}
+
+	public void setUrls(List<String> urls) {
+		m_Urls = urls;
+	}
+
+	public void setNo(String no) {
+		m_No = no;
+	}
+
+	public void setVersion(String version) {
+		m_Version = version;
+	}
+
+	public void setCompatibleVersion(String compatibleVersion) {
+		m_CompatibleVersion = compatibleVersion;
+	}
+
+	public void setHeartbeatPeriod(int heartbeatPeriod) {
+		m_HeartbeatPeriod = heartbeatPeriod;
+	}
+
+	public void setBuildVersion(String buildVersion) {
+		m_BuildVersion = buildVersion;
+	}
+
+	public void setNote(String note) {
+		m_Note = note;
+	}
+
+	public void setDocumentMethod(String documentMethod) {
+		m_DocumentMethod = documentMethod;
+	}
+
+	public void setRunningId(String runningId) {
+		m_RunningId = runningId;
+	}
+
+	@Override
+	public String getDomain() {
+		return m_Domain;
+	}
+
+	@Override
+	public int getPort() {
+		return m_Port;
+	}
+
+	@Override
+	public int getRequestMaxSize() {
+		return m_RequestMaxSize;
+	}
+
+	@Override
+	public int getMarks() {
+		return m_Marks;
+	}
+
+	@Override
+	public String getDebugMethod() {
+		return m_DebugMethod;
+	}
 
 	// @Override
 	public String getId() {
@@ -98,7 +267,7 @@ public class ServiceInstance extends SimpleService implements ServiceExt {
 
 	@Override
 	public int getHeartbeatPeriod() {
-		int period = super.getHeartbeatPeriod();
+		int period = m_HeartbeatPeriod;
 		if (period < 0) {
 			period = -1;
 		}
@@ -247,5 +416,13 @@ public class ServiceInstance extends SimpleService implements ServiceExt {
 	 */
 	public boolean isSelfMesh() {
 		return null == m_MeshNode || m_MeshNode.isSelf();
+	}
+
+	public ClientChannel getClientChannel() {
+		return m_ClientChannel;
+	}
+
+	public void setClientChannel(ClientChannel clientChannel) {
+		m_ClientChannel = clientChannel;
 	}
 }
