@@ -259,7 +259,7 @@ public class ServiceEndpointImpl extends ServiceEndpoint {
 			try {
 				m_Context = channel.request(this, m_Url.url, HttpConstants.METHOD_POST);
 				m_Context.setTimeout(timeout * 1000);
-			} catch (Exception e) {
+			} catch (IOException e) {
 				m_Url.fail();
 				responseError(e);
 			}
