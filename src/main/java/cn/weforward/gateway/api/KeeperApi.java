@@ -84,6 +84,7 @@ class KeeperApi extends AbstractGatewayApi {
 		register(listAccessGroup);
 		register(createAccess);
 		register(updateAccess);
+		register(getAccess);
 
 		register(listService);
 		register(listServiceName);
@@ -184,6 +185,16 @@ class KeeperApi extends AbstractGatewayApi {
 		}
 	};
 
+	private ApiMethod getAccess = new ApiMethod("get_access") {
+
+		@Override
+		AccessExtVo execute(Header reqHeader, FriendlyObject params) throws ApiException {
+			String id = params.getString("id");
+			AccessExt access = m_AccessManage.getAccess(id);
+			return AccessExtVo.valueOf(access);
+		}
+	};
+
 	private ApiMethod updateAccess = new ApiMethod("update_access") {
 
 		@Override
@@ -216,6 +227,14 @@ class KeeperApi extends AbstractGatewayApi {
 				}
 				if ('*' != keyword.charAt(keyword.length() - 1)) {
 					keyword = keyword + '*';
+				}
+			}
+			String prefix = params.getString("prefix");
+			if (!StringUtil.isEmpty(prefix)) {
+				if (StringUtil.isEmpty(keyword)) {
+					keyword = prefix + '*';
+				} else {
+					keyword = prefix + keyword;
 				}
 			}
 			int page = params.getInt("page", 1);

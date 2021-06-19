@@ -111,6 +111,7 @@
 		<property name="gateway" ref="gateway" />
 		<property name="distributeManage" ref="distributeManage" />
 		<property name="meshManage" ref="meshManage" />
+		<property name="pluginContainer" ref="pluginContainer" />
 	</bean>
 
 	<!-- 插件管理 -->
@@ -119,7 +120,7 @@
 		<property name="gatewayNodes" ref="gatewayNodes" />
 		<property name="gateway" ref="gateway" />
 		<property name="pluginNames"
-			value="cn.weforward.gateway.plugin.mongodb.DataFactory;cn.weforward.gateway.plugin.alarm.Alarmers;cn.weforward.gateway.plugin.access.UserAccessProvider" />
+			value="${plugins:cn.weforward.gateway.plugin.mongodb.DataFactory;cn.weforward.gateway.plugin.alarm.Alarmers;cn.weforward.gateway.plugin.access.UserAccessProvider}" />
 	</bean>
 
 	<!-- 监控注册表 -->

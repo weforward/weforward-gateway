@@ -11,10 +11,11 @@
 package cn.weforward.gateway.api;
 
 import cn.weforward.common.ResultPage;
-import cn.weforward.common.util.ListUtil;
 import cn.weforward.common.util.StringUtil;
-import cn.weforward.gateway.Configure;
 import cn.weforward.gateway.GatewayExt;
+import cn.weforward.gateway.PluginContainer;
+import cn.weforward.gateway.PluginListener;
+import cn.weforward.gateway.Pluginable;
 import cn.weforward.protocol.Header;
 import cn.weforward.protocol.ServiceName;
 import cn.weforward.protocol.aio.ClientChannel;
@@ -27,7 +28,6 @@ import cn.weforward.protocol.support.CommonServiceCodes;
 import cn.weforward.protocol.support.PageData;
 import cn.weforward.protocol.support.PageDataMapper;
 import cn.weforward.protocol.support.SimpleObjectMapperSet;
-import cn.weforward.protocol.support.SpecificationChecker;
 import cn.weforward.protocol.support.datatype.FriendlyObject;
 
 /**
@@ -36,13 +36,15 @@ import cn.weforward.protocol.support.datatype.FriendlyObject;
  * @author zhangpengji
  *
  */
-class ServiceRegisterApi extends AbstractGatewayApi {
+class ServiceRegisterApi extends AbstractGatewayApi implements PluginListener {
 
+	ServiceChecker m_ServiceChecker;
 	SimpleObjectMapperSet m_Mappers;
 	GatewayExt m_Gateway;
 
 	ServiceRegisterApi() {
 		super();
+		m_ServiceChecker = ServiceChecker.DEFALUT;
 
 		SimpleObjectMapperSet mappers = new SimpleObjectMapperSet();
 		mappers.register(BeanObjectMapper.getInstance(ServiceVo.class));
@@ -64,6 +66,22 @@ class ServiceRegisterApi extends AbstractGatewayApi {
 		m_Gateway = gw;
 	}
 
+	public void setPluginContainer(PluginContainer container) {
+		container.register(this);
+	}
+
+	@Override
+	public void onPluginLoad(Pluginable plugin) {
+		if (plugin instanceof ServiceChecker) {
+			((ServiceChecker) plugin).setPreCheck(m_ServiceChecker);
+			m_ServiceChecker = (ServiceChecker) plugin;
+		}
+	}
+
+	@Override
+	public void onPluginUnload(Pluginable plugin) {
+	}
+
 	@Override
 	public String getName() {
 		return ServiceName.SERVICE_REGISTER.name;
@@ -79,15 +97,16 @@ class ServiceRegisterApi extends AbstractGatewayApi {
 		@Override
 		Void execute(Header reqHeader, FriendlyObject params, ServerContext context) throws ApiException {
 			ServiceVo info = params.toObject(ServiceVo.class, m_Mappers);
-			String errorMsg = checkService(info);
+			String owner = reqHeader.getAccessId();
+			String errorMsg = m_ServiceChecker.check(info, owner);
 			if (!StringUtil.isEmpty(errorMsg)) {
 				throw new ApiException(CommonServiceCodes.ILLEGAL_ARGUMENT.code, errorMsg);
 			}
 			ClientChannel channel = null;
-			if(context instanceof ServerBackwardChannel) {
+			if (context instanceof ServerBackwardChannel) {
 				channel = ((ServerBackwardChannel) context).getClientChannel();
 			}
-			m_Gateway.registerService(reqHeader.getAccessId(), info, info.serviceRuntime, channel);
+			m_Gateway.registerService(owner, info, info.serviceRuntime, channel);
 			return null;
 		}
 	};
@@ -97,11 +116,12 @@ class ServiceRegisterApi extends AbstractGatewayApi {
 		@Override
 		Void execute(Header reqHeader, FriendlyObject params) throws ApiException {
 			ServiceVo info = params.toObject(ServiceVo.class, m_Mappers);
-			String errorMsg = checkService(info);
+			String owner = reqHeader.getAccessId();
+			String errorMsg = m_ServiceChecker.check(info, owner);
 			if (!StringUtil.isEmpty(errorMsg)) {
 				throw new ApiException(CommonServiceCodes.ILLEGAL_ARGUMENT.code, errorMsg);
 			}
-			m_Gateway.unregisterService(reqHeader.getAccessId(), info);
+			m_Gateway.unregisterService(owner, info);
 			return null;
 		}
 	};
@@ -122,22 +142,4 @@ class ServiceRegisterApi extends AbstractGatewayApi {
 		}
 	};
 
-	String checkService(ServiceVo info) {
-		String nameErr = SpecificationChecker.checkServiceName(info.name);
-		if (!StringUtil.isEmpty(nameErr)) {
-			return nameErr;
-		}
-		if ((StringUtil.isEmpty(info.domain) || 0 == info.port) && ListUtil.isEmpty(info.urls)) {
-			return "微服务信息不完整";
-		}
-		String noErr = SpecificationChecker.checkServiceNo(info.no);
-		if (!StringUtil.isEmpty(noErr)) {
-			return noErr;
-		}
-		int maxSize = info.requestMaxSize;
-		if (maxSize < 0 || maxSize > Configure.getInstance().getServiceRequestMaxSize()) {
-			return "微服务请求数据的最大字节数不合法：" + maxSize;
-		}
-		return null;
-	}
 }

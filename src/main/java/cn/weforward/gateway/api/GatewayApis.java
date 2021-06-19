@@ -11,6 +11,7 @@
 package cn.weforward.gateway.api;
 
 import cn.weforward.gateway.GatewayExt;
+import cn.weforward.gateway.PluginContainer;
 import cn.weforward.gateway.distribute.DistributeManage;
 import cn.weforward.gateway.mesh.MeshManage;
 import cn.weforward.gateway.ops.access.AccessManage;
@@ -57,9 +58,13 @@ public class GatewayApis {
 	public void setDistributeManage(DistributeManage dm) {
 		m_DistributeApi.setDistributeManage(dm);
 	}
-	
+
 	public void setMeshManage(MeshManage mm) {
 		m_MeshApi.setMeshManage(mm);
+	}
+
+	public void setPluginContainer(PluginContainer container) {
+		m_ServiceRegisterApi.setPluginContainer(container);
 	}
 
 	/**
@@ -78,7 +83,7 @@ public class GatewayApis {
 		if (m_KeeperApi.getName().equals(name)) {
 			return m_KeeperApi;
 		}
-		if(m_MeshApi.getName().equals(name)) {
+		if (m_MeshApi.getName().equals(name)) {
 			return m_MeshApi;
 		}
 		return null;
