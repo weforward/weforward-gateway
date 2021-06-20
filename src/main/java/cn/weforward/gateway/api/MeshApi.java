@@ -18,11 +18,10 @@ import java.util.List;
 import cn.weforward.common.ResultPage;
 import cn.weforward.common.util.TransList;
 import cn.weforward.gateway.MeshNode;
-import cn.weforward.gateway.ServiceInstance;
-import cn.weforward.gateway.distribute.ServiceInstanceMapper;
 import cn.weforward.gateway.mesh.MeshManage;
 import cn.weforward.gateway.mesh.MeshNodeVo;
 import cn.weforward.gateway.mesh.MeshNodeWrap;
+import cn.weforward.gateway.mesh.MeshService;
 import cn.weforward.gateway.ops.access.system.MasterKeyVo;
 import cn.weforward.gateway.ops.access.system.ServiceAccessVo;
 import cn.weforward.gateway.ops.right.RightTableVo;
@@ -54,7 +53,7 @@ public class MeshApi extends AbstractGatewayApi {
 		super();
 
 		m_Mappers = new SimpleObjectMapperSet();
-		m_Mappers.register(ServiceInstanceMapper.INSTANCE);
+		m_Mappers.register(BeanObjectMapper.getInstance(MeshService.class));
 		m_Mappers.register(BeanObjectMapper.getInstance(MeshNodeVo.class));
 		m_Mappers.register(BeanObjectMapper.getInstance(MasterKeyVo.class));
 		m_Mappers.register(BeanObjectMapper.getInstance(ServiceAccessVo.class));
@@ -89,8 +88,8 @@ public class MeshApi extends AbstractGatewayApi {
 		@Override
 		Void execute(Header reqHeader, FriendlyObject params) throws ApiException {
 			List<MeshNodeVo> nodeVos = params.getList("nodes", MeshNodeVo.class, getMappers());
-			List<ServiceInstance> regs = params.getList("reg_services", ServiceInstance.class, getMappers());
-			List<ServiceInstance> unregs = params.getList("unreg_services", ServiceInstance.class, getMappers());
+			List<MeshService> regs = params.getList("reg_services", MeshService.class, getMappers());
+			List<MeshService> unregs = params.getList("unreg_services", MeshService.class, getMappers());
 			List<Object> updateds = toList(params.getList("updated_objects"));
 
 			List<MeshNode> nodes = new TransList<MeshNode, MeshNodeVo>(nodeVos) {

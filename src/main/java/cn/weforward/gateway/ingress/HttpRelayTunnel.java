@@ -11,33 +11,32 @@
 package cn.weforward.gateway.ingress;
 
 import java.io.OutputStream;
-import java.security.MessageDigest;
 import java.util.concurrent.RejectedExecutionException;
 
-import cn.weforward.common.crypto.Base64;
 import cn.weforward.gateway.Pipe;
-import cn.weforward.protocol.Access;
+import cn.weforward.gateway.auth.GatewayAuther;
 import cn.weforward.protocol.Header;
 import cn.weforward.protocol.aio.http.HttpConstants;
 import cn.weforward.protocol.aio.http.HttpContext;
 import cn.weforward.protocol.aio.http.HttpHeaderHelper;
 import cn.weforward.protocol.aio.http.HttpHeaders;
+import cn.weforward.protocol.exception.AuthException;
 import cn.weforward.protocol.exception.WeforwardException;
 
 /**
- * 来自网格转发的管道
+ * （来自其他网关的）中继的管道
  * 
  * @author zhangpengji
  *
  */
-public class HttpMeshTunnel extends HttpTunnel {
+public class HttpRelayTunnel extends HttpTunnel {
 
-	public HttpMeshTunnel(HttpContext ctx, ServerHandlerSupporter supporter, String addr, boolean trust) {
+	public HttpRelayTunnel(HttpContext ctx, ServerHandlerSupporter supporter, String addr, boolean trust) {
 		super(ctx, supporter, addr, trust);
 	}
 
 	@Override
-	public boolean isFromMeshForward() {
+	public boolean isRelay() {
 		return true;
 	}
 
@@ -72,27 +71,15 @@ public class HttpMeshTunnel extends HttpTunnel {
 			return;
 		}
 
-		if (!verifyMeshSign(header)) {
-			responseError(WeforwardException.CODE_INVOKE_DENIED, "网格签名验证失败");
+		GatewayAuther auther = new GatewayAuther(m_Supporter.getAccessManage());
+		try {
+			auther.verify(header);
+		} catch (AuthException e) {
+			responseError(e);
 			return;
 		}
 
 		m_Header = header;
-	}
-	
-	boolean verifyMeshSign(Header header) {
-		try {
-			// XXX 应该把验证过程封装起来
-			MessageDigest md = MessageDigest.getInstance("SHA-256");
-			Access internalAccess = m_Supporter.getAccessManage().getInternalAccess();
-			md.update((header.getService() + header.getNoise()).getBytes("utf-8"));
-			md.update(internalAccess.getAccessKey());
-			String meshSign = "Mesh-Forward "+internalAccess.getAccessId() + ":" + Base64.encode(md.digest());
-			return header.getMeshAuth().equals(meshSign);
-		} catch (Throwable e) {
-			_Logger.error(e.toString(), e);
-			return false;
-		}
 	}
 
 	@Override
@@ -117,7 +104,7 @@ public class HttpMeshTunnel extends HttpTunnel {
 	public void run() {
 		try {
 			// 对接微服务端
-			m_Supporter.getGateway().joint(HttpMeshTunnel.this);
+			m_Supporter.getGateway().joint(HttpRelayTunnel.this);
 		} catch (Throwable e) {
 			responseError(e);
 			return;

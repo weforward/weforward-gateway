@@ -122,6 +122,11 @@ public abstract class ImitatedTunnel implements Tunnel {
 	public int getMarks() {
 		return 0;
 	}
+	
+	@Override
+	public String getGatewayAuthType() {
+		return null;
+	}
 
 	@Override
 	public boolean isFromGatewayInternal() {

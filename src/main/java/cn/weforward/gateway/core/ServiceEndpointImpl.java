@@ -14,13 +14,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URLEncoder;
-import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.RejectedExecutionException;
 
-import cn.weforward.common.crypto.Base64;
 import cn.weforward.common.execption.InvalidFormatException;
 import cn.weforward.common.io.BytesOutputStream;
 import cn.weforward.common.json.JsonInput;
@@ -30,9 +28,11 @@ import cn.weforward.common.json.JsonPair;
 import cn.weforward.common.json.JsonParseAbort;
 import cn.weforward.common.json.JsonUtil;
 import cn.weforward.common.util.Bytes;
+import cn.weforward.common.util.ListUtil;
 import cn.weforward.common.util.StringBuilderPool;
 import cn.weforward.common.util.StringUtil;
 import cn.weforward.gateway.Configure;
+import cn.weforward.gateway.GatewayNode;
 import cn.weforward.gateway.MeshNode;
 import cn.weforward.gateway.Pipe;
 import cn.weforward.gateway.ServiceInstance;
@@ -84,11 +84,23 @@ public class ServiceEndpointImpl extends ServiceEndpoint {
 
 	private void initUrls() {
 		List<String> urls;
-		if (!isSelfMesh()) {
-			MeshNode node = m_Service.getMeshNode();
-			List<String> prefixs = node.getUrls();
-			urls = new ArrayList<>(prefixs.size());
-			for (String prefix : prefixs) {
+		List<String> relayPrefixs = null;
+		String relayType = null;
+		if (m_Service.isDedicatedChannel()) {
+			// 专用信道需要中继
+			MeshNode mn = m_Service.getMeshNode();
+			GatewayNode gn = m_Service.getGatewayNode();
+			if (null != mn && !ListUtil.isEmpty(mn.getUrls())) {
+				relayPrefixs = mn.getUrls();
+				relayType = Header.GATEWAY_AUTH_TYPE_MESH_RELAY;
+			} else if (null != gn && !ListUtil.isEmpty(gn.getUrls())) {
+				relayPrefixs = gn.getUrls();
+				relayType = Header.GATEWAY_AUTH_TYPE_RELAY;
+			}
+		}
+		if (!ListUtil.isEmpty(relayPrefixs)) {
+			urls = new ArrayList<>(relayPrefixs.size());
+			for (String prefix : relayPrefixs) {
 				String url = prefix + m_Service.getName();
 				urls.add(url);
 			}
@@ -97,27 +109,27 @@ public class ServiceEndpointImpl extends ServiceEndpoint {
 		}
 		List<EndpointUrl> endpointUrls;
 		if (1 == urls.size()) {
-			endpointUrls = Collections.singletonList(new EndpointUrl(urls.get(0)));
+			endpointUrls = Collections.singletonList(new EndpointUrl(urls.get(0), relayType));
 		} else {
 			endpointUrls = new ArrayList<>(urls.size());
 			for (String url : urls) {
-				endpointUrls.add(new EndpointUrl(url));
+				endpointUrls.add(new EndpointUrl(url, relayType));
 			}
 		}
 		m_EndpointUrls = endpointUrls;
 	}
-
+	
 	@Override
 	protected Pipe openPipe(Tunnel tunnel, boolean supportForward) {
 		EndpointPipe pipe;
-		if (tunnel.isFromMeshForward()) {
-			pipe = new MeshForwardEndpointPipe(tunnel, getEndpointUrl(), getService());
+		if (tunnel.isRelay()) {
+			pipe = new RelayEndpointPipe(tunnel, getEndpointUrl(), getService());
 		} else {
 			ServiceTraceToken token = createTraceToken(tunnel);
 			pipe = new EndpointPipe(tunnel, getEndpointUrl(), getService(), token, supportForward);
 		}
 		ClientChannel channel = m_Service.getClientChannel();
-		if(null == channel) {
+		if (null == channel) {
 			channel = getHttpClientFactory();
 		}
 		pipe.open(channel, m_ReadTimeout);
@@ -143,11 +155,13 @@ public class ServiceEndpointImpl extends ServiceEndpoint {
 	}
 
 	static class EndpointUrl {
-		String url;
+		final String url;
+		final String relayType;
 		volatile int weight;
 
-		EndpointUrl(String url) {
+		EndpointUrl(String url, String relayType) {
 			this.url = url;
+			this.relayType = relayType;
 		}
 
 		void success() {
@@ -244,6 +258,18 @@ public class ServiceEndpointImpl extends ServiceEndpoint {
 		}
 
 		void open(ClientChannel channel, int timeout) {
+			String preRelayType = m_Tunnel.getGatewayAuthType();
+			String currRelayType = m_EndpointUrls.get(0).relayType;
+			if (!StringUtil.isEmpty(preRelayType) && !StringUtil.isEmpty(currRelayType)) {
+				if (Header.GATEWAY_AUTH_TYPE_MESH_RELAY.equals(preRelayType)
+						&& Header.GATEWAY_AUTH_TYPE_RELAY.equals(currRelayType)) {
+					// 仅支持Mesh-Forward -> Forward
+				} else {
+					responseError(WeforwardException.CODE_INVOKE_DENIED,
+							"不支持中继嵌套：" + preRelayType + " -> " + currRelayType);
+					return;
+				}
+			}
 			int waitTimeout = m_Tunnel.getWaitTimeout();
 			if (waitTimeout > 0) {
 				if (waitTimeout >= 5) {
@@ -362,16 +388,10 @@ public class ServiceEndpointImpl extends ServiceEndpoint {
 					channel = Header.CHANNEL_RPC;
 				}
 				header.setChannel(channel);
-				if (null != service.getMeshNode()) {
-					// 标识请求来源为网格
-					header.setServiceNo(service.getNo());
-					// XXX 应该把签名过程封装起来
-					MessageDigest md = MessageDigest.getInstance("SHA-256");
-					Access internalAccess = getInternalAccess();
-					md.update((header.getService() + header.getNoise()).getBytes("utf-8"));
-					md.update(internalAccess.getAccessKey());
-					String meshSign = "Mesh-Forward "+internalAccess.getAccessId() + ":" + Base64.encode(md.digest());
-					header.setMeshAuth(meshSign);
+				header.setServiceNo(service.getNo());
+				if (!StringUtil.isEmpty(m_Url.relayType)) {
+					// 通过网关中继
+					getGatewayAuther().generate(m_Url.relayType, header);
 				}
 
 				// 组织wf_req
@@ -749,7 +769,9 @@ public class ServiceEndpointImpl extends ServiceEndpoint {
 			} finally {
 				end(state);
 				StringBuilderPool._8k.offer(sb);
-				m_Context.disconnect();
+				if (null != m_Context) {
+					m_Context.disconnect();
+				}
 			}
 		}
 
@@ -917,14 +939,14 @@ public class ServiceEndpointImpl extends ServiceEndpoint {
 	}
 
 	/**
-	 * 处理网格转发的微服务管道
+	 * 处理中继的微服务管道
 	 * 
 	 * @author zhangpengji
 	 *
 	 */
-	class MeshForwardEndpointPipe extends EndpointPipe {
+	class RelayEndpointPipe extends EndpointPipe {
 
-		MeshForwardEndpointPipe(Tunnel tunnel, EndpointUrl url, ServiceInstance service) {
+		RelayEndpointPipe(Tunnel tunnel, EndpointUrl url, ServiceInstance service) {
 			super(tunnel, url, service, null, false);
 		}
 
@@ -972,7 +994,7 @@ public class ServiceEndpointImpl extends ServiceEndpoint {
 				return;
 			}
 		}
-		
+
 		@Override
 		void parseWfResp() {
 			synchronized (this) {
@@ -984,7 +1006,7 @@ public class ServiceEndpointImpl extends ServiceEndpoint {
 
 			m_Tunnel.responseReady(this);
 		}
-		
+
 		@Override
 		public void responseReady(Tunnel tunnel, OutputStream output) {
 			checkTunnel(tunnel);

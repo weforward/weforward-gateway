@@ -211,9 +211,9 @@ public class HttpGatewayServer implements ServerHandlerFactory {
 		return new CheckFromResult(ip, null);
 	}
 
-	protected boolean checkMeshForward(HttpContext ctx) {
+	protected boolean checkRelay(HttpContext ctx) {
 		HttpHeaders headers = ctx.getRequestHeaders();
-		return null != headers && !StringUtil.isEmpty(headers.get(HttpConstants.WF_MESH_AUTH));
+		return null != headers && !StringUtil.isEmpty(headers.get(HttpConstants.WF_GW_AUTH));
 	}
 
 	private int getMethod(String method) {
@@ -287,8 +287,8 @@ public class HttpGatewayServer implements ServerHandlerFactory {
 	}
 
 	private ServerHandler openTunnel(HttpContext ctx, CheckFromResult cfr) throws IOException {
-		if (checkMeshForward(ctx)) {
-			return new HttpMeshTunnel(ctx, m_Supporter, cfr.realIp, Boolean.TRUE.equals(cfr.trust));
+		if (checkRelay(ctx)) {
+			return new HttpRelayTunnel(ctx, m_Supporter, cfr.realIp, Boolean.TRUE.equals(cfr.trust));
 		}
 		return new HttpTunnel(ctx, m_Supporter, cfr.realIp, Boolean.TRUE.equals(cfr.trust));
 	}

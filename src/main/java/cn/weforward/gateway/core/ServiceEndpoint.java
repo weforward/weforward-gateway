@@ -33,6 +33,7 @@ import cn.weforward.gateway.ServiceInstance;
 import cn.weforward.gateway.StreamPipe;
 import cn.weforward.gateway.StreamTunnel;
 import cn.weforward.gateway.Tunnel;
+import cn.weforward.gateway.auth.GatewayAuther;
 import cn.weforward.gateway.exception.DebugServiceException;
 import cn.weforward.gateway.ops.trace.ServiceTracer;
 import cn.weforward.gateway.util.SyncTunnel;
@@ -68,6 +69,7 @@ public abstract class ServiceEndpoint extends BalanceElement {
 	protected int m_ConnectTimeout;
 	/** 读取超时，秒 */
 	protected int m_ReadTimeout;
+	protected GatewayAuther m_GatewayAuther;
 
 	protected ServiceEndpoint(ServiceInstanceBalance balance, ServiceInstance service, TrafficTableItem rule) {
 		super(rule.getWeight());
@@ -133,6 +135,13 @@ public abstract class ServiceEndpoint extends BalanceElement {
 		return m_Balance.getResourceRight(access, resId);
 	}
 
+	GatewayAuther getGatewayAuther() {
+		if (null == m_GatewayAuther) {
+			m_GatewayAuther = new GatewayAuther(m_Balance.getAccessLoaderExt());
+		}
+		return m_GatewayAuther;
+	}
+
 	/**
 	 * 更新微服务信息
 	 * 
@@ -183,7 +192,7 @@ public abstract class ServiceEndpoint extends BalanceElement {
 		if (!url1.equals(url2)) {
 			return false;
 		}
-		if(s1.getClientChannel() != s2.getClientChannel()) {
+		if (s1.getClientChannel() != s2.getClientChannel()) {
 			return false;
 		}
 		// 若所在网格变了，编号、链接应该都变了，故省略以下判断
@@ -224,10 +233,6 @@ public abstract class ServiceEndpoint extends BalanceElement {
 			return false;
 		}
 		return nos.contains(m_Service.getNo());
-	}
-
-	boolean isSelfMesh() {
-		return m_Service.isSelfMesh();
 	}
 
 	/**

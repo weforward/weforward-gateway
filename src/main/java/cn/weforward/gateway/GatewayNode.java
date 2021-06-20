@@ -8,38 +8,50 @@
  * THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  * 
  */
-package cn.weforward.gateway.distribute;
+package cn.weforward.gateway;
 
-import cn.weforward.gateway.ServiceInstance;
-import cn.weforward.gateway.mesh.MeshNodeVo;
-import cn.weforward.protocol.gateway.vo.ServiceExtVo;
-import cn.weforward.protocol.ops.ServiceExt;
+import java.util.List;
 
-public class ServiceDistributeVo extends ServiceExtVo {
+/**
+ * 网关节点
+ * 
+ * @author zhangpengji
+ *
+ */
+public interface GatewayNode {
 
-	public MeshNodeVo meshNode;
+	/**
+	 * 节点标识（服务器id）
+	 * 
+	 * @return
+	 */
+	String getId();
 
-	public ServiceDistributeVo() {
+	/**
+	 * 节点的域名（ip地址）
+	 * 
+	 * @return
+	 */
+	String getHostName();
 
-	}
+	/**
+	 * 节点的端口
+	 * 
+	 * @return
+	 */
+	int getPort();
 
-	public ServiceDistributeVo(ServiceInstance service) {
-		super((ServiceExt) service);
-		this.meshNode = MeshNodeVo.valueOf(service.getMeshNode());
-	}
+	/**
+	 * 节点入口链接
+	 * 
+	 * @return
+	 */
+	List<String> getUrls();
 
-	public static ServiceDistributeVo valueOf(ServiceInstance service) {
-		if (null == service) {
-			return null;
-		}
-		return new ServiceDistributeVo(service);
-	}
-
-	public MeshNodeVo getMeshNode() {
-		return meshNode;
-	}
-
-	public void setMeshNode(MeshNodeVo meshNode) {
-		this.meshNode = meshNode;
-	}
+	/**
+	 * 节点是否为当前网关
+	 * 
+	 * @return
+	 */
+	boolean isSelf();
 }

@@ -10,6 +10,10 @@
  */
 package cn.weforward.gateway.distribute;
 
+import java.util.List;
+
+import cn.weforward.gateway.GatewayNode;
+
 /**
  * 包装Vo的GateWayNode实现
  * 
@@ -35,7 +39,7 @@ public class GatewayNodeWrap implements GatewayNode {
 
 	@Override
 	public String getHostName() {
-		return getVo().hostName;
+		return getVo().getHostName();
 	}
 
 	@Override
@@ -46,6 +50,11 @@ public class GatewayNodeWrap implements GatewayNode {
 	@Override
 	public boolean isSelf() {
 		throw new UnsupportedOperationException();
+	}
+	
+	@Override
+	public List<String> getUrls() {
+		return getVo().getUrls();
 	}
 
 }

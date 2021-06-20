@@ -8,39 +8,53 @@
  * THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  * 
  */
-package cn.weforward.gateway.distribute;
+package cn.weforward.gateway.mesh;
 
-import cn.weforward.gateway.GatewayNode;
-import cn.weforward.protocol.datatype.DtObject;
-import cn.weforward.protocol.exception.ObjectMappingException;
-import cn.weforward.protocol.ext.ObjectMapper;
-import cn.weforward.protocol.support.BeanObjectMapper;
+import cn.weforward.gateway.ServiceInstance;
+import cn.weforward.protocol.gateway.vo.ServiceExtVo;
+import cn.weforward.protocol.gateway.vo.ServiceExtWrap;
+import cn.weforward.protocol.ops.ServiceExt;
 
-public class GatewayNodeMapper implements ObjectMapper<GatewayNode> {
+/**
+ * 网格中的微服务实例
+ * 
+ * @author smily
+ *
+ */
+public class MeshService extends ServiceExtVo {
 
-	public static final GatewayNodeMapper INSTANCE = new GatewayNodeMapper();
+	public MeshNodeVo meshNode;
 
-	private BeanObjectMapper<GatewayNodeVo> m_Mapper;
+	public MeshService() {
 
-	private GatewayNodeMapper() {
-		m_Mapper = BeanObjectMapper.getInstance(GatewayNodeVo.class);
 	}
 
-	@Override
-	public String getName() {
-		return GatewayNode.class.getName();
+	public MeshService(ServiceInstance service) {
+		super((ServiceExt) service);
+		this.meshNode = MeshNodeVo.valueOf(service.getMeshNode());
 	}
 
-	@Override
-	public DtObject toDtObject(GatewayNode node) throws ObjectMappingException {
-		GatewayNodeVo vo = GatewayNodeVo.valueOf(node);
-		DtObject result = m_Mapper.toDtObject(vo);
-		return result;
+	public static MeshService valueOf(ServiceInstance service) {
+		if (null == service) {
+			return null;
+		}
+		return new MeshService(service);
+	}
+	
+	public ServiceInstance toServiceInstance() {
+		ServiceInstance serviceInstance = new ServiceInstance(new ServiceExtWrap(this));
+		if (null != this.meshNode) {
+			serviceInstance.setMeshNode(new MeshNodeWrap(this.meshNode));
+		}
+		return serviceInstance;
 	}
 
-	@Override
-	public GatewayNode fromDtObject(DtObject obj) throws ObjectMappingException {
-		GatewayNodeVo vo = m_Mapper.fromDtObject(obj);
-		return new GatewayNodeWrap(vo);
+	public MeshNodeVo getMeshNode() {
+		return meshNode;
 	}
+
+	public void setMeshNode(MeshNodeVo meshNode) {
+		this.meshNode = meshNode;
+	}
+
 }

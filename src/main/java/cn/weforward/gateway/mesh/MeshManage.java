@@ -18,7 +18,6 @@ import org.slf4j.LoggerFactory;
 
 import cn.weforward.common.ResultPage;
 import cn.weforward.gateway.MeshNode;
-import cn.weforward.gateway.ServiceInstance;
 import cn.weforward.gateway.ops.access.system.MasterKeyVo;
 import cn.weforward.gateway.ops.access.system.ServiceAccessVo;
 import cn.weforward.gateway.ops.right.RightTableVo;
@@ -44,7 +43,7 @@ public interface MeshManage {
 	 *            从兄弟节点注销的微服务
 	 * @return
 	 */
-	void syncFromBrother(List<MeshNode> nodes, List<ServiceInstance> regServices, List<ServiceInstance> unregServices,
+	void syncFromBrother(List<MeshNode> nodes, List<MeshService> regServices, List<MeshService> unregServices,
 			List<Object> updatedObjects);
 
 	ResultPage<MasterKeyVo> searchMasterKeyVo(Date begin, Date end);

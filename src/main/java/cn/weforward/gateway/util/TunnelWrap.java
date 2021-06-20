@@ -74,5 +74,10 @@ public abstract class TunnelWrap implements Tunnel {
 	public int getMarks() {
 		return m_Tunnel.getMarks();
 	}
+	
+	@Override
+	public String getGatewayAuthType() {
+		return m_Tunnel.getGatewayAuthType();
+	}
 
 }

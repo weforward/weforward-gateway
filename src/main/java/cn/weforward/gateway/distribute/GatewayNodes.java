@@ -12,6 +12,8 @@ package cn.weforward.gateway.distribute;
 
 import java.util.List;
 
+import cn.weforward.gateway.GatewayNode;
+
 /**
  * 网关节点集合
  * 

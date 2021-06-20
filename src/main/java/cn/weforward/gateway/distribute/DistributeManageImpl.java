@@ -29,9 +29,13 @@ import cn.weforward.common.json.JsonObject;
 import cn.weforward.common.json.JsonUtil;
 import cn.weforward.common.json.StringInput;
 import cn.weforward.common.sys.Shutdown;
+import cn.weforward.common.util.ClassUtil;
 import cn.weforward.common.util.ResultPageHelper;
 import cn.weforward.common.util.StringUtil;
+import cn.weforward.common.util.TransList;
+import cn.weforward.common.util.TransResultPage;
 import cn.weforward.gateway.GatewayExt;
+import cn.weforward.gateway.GatewayNode;
 import cn.weforward.gateway.PluginContainer;
 import cn.weforward.gateway.PluginListener;
 import cn.weforward.gateway.Pluginable;
@@ -42,18 +46,20 @@ import cn.weforward.protocol.Access;
 import cn.weforward.protocol.AccessLoader;
 import cn.weforward.protocol.Header;
 import cn.weforward.protocol.Response;
+import cn.weforward.protocol.Service;
 import cn.weforward.protocol.ServiceName;
 import cn.weforward.protocol.client.ServiceInvoker;
 import cn.weforward.protocol.client.SingleServiceInvoker;
 import cn.weforward.protocol.client.execption.ServiceInvokeException;
 import cn.weforward.protocol.client.ext.RemoteResultPage;
 import cn.weforward.protocol.client.ext.RequestInvokeObject;
-import cn.weforward.protocol.datatype.DtList;
 import cn.weforward.protocol.datatype.DtObject;
+import cn.weforward.protocol.ext.ObjectMapperSet;
 import cn.weforward.protocol.ext.Producer;
-import cn.weforward.protocol.support.PageDataMapper;
+import cn.weforward.protocol.gateway.vo.ServiceExtWrap;
+import cn.weforward.protocol.support.BeanObjectMapper;
+import cn.weforward.protocol.support.SimpleObjectMapperSet;
 import cn.weforward.protocol.support.SimpleProducer;
-import cn.weforward.protocol.support.datatype.SimpleDtList;
 
 /**
  * <code>DistributeManage</code>实现
@@ -75,7 +81,8 @@ public class DistributeManageImpl
 	/** 兄弟节点的操作锁 */
 	protected final Object m_BrotherNodesLock = new Object();
 	// 已注册的网关节点监听器
-	private List<GatewayNodeListener> m_GatewayNodeListeners;
+	protected List<GatewayNodeListener> m_GatewayNodeListeners;
+	protected ObjectMapperSet m_Mappers;
 
 	/** 注册到此节点的微服务 */
 	protected Map<String, ServiceInstance> m_RegServices;
@@ -97,6 +104,12 @@ public class DistributeManageImpl
 		m_SelfNode = new NodeSelf(id, host, port);
 		m_BrotherNodes = Collections.emptyMap();
 		m_GatewayNodeListeners = new CopyOnWriteArrayList<>();
+
+		m_Mappers = new SimpleObjectMapperSet();
+		m_Mappers.register(GatewayNodeMapper.INSTANCE, GatewayNode.class);
+		m_Mappers.register(GatewayNodeMapper.INSTANCE, ClassUtil.getSimpleName(NodeSelf.class));
+		m_Mappers.register(GatewayNodeMapper.INSTANCE, ClassUtil.getSimpleName(NodeAgent.class));
+		m_Mappers.register(BeanObjectMapper.getInstance(DistributedService.class), DistributedService.class);
 
 		Shutdown.register(this);
 	}
@@ -191,16 +204,85 @@ public class DistributeManageImpl
 	}
 
 	@Override
-	public void syncFromBrother(List<GatewayNode> nodes, List<ServiceInstance> regServices,
-			List<ServiceInstance> unregServices) {
-		// 同步微服务
+	public void syncFromBrother(List<GatewayNode> nodes, List<DistributedService> regServices,
+			List<DistributedService> unregServices) {
+		// 更新兄弟节点
 		try {
-			m_Gateway.syncServices(regServices, unregServices, false);
+			updateBrothers(nodes);
 		} catch (Throwable e) {
 			_Logger.error(e.toString(), e);
 		}
-		// 更新兄弟节点
-		updateBrothers(nodes);
+		// 同步微服务
+		try {
+			m_Gateway.syncServices(toServiceInstance(regServices), toServiceInstance(unregServices), false);
+		} catch (Throwable e) {
+			_Logger.error(e.toString(), e);
+		}
+	}
+
+	ServiceInstance toServiceInstance(DistributedService ds) {
+		ServiceInstance service = new ServiceInstance(new ServiceExtWrap(ds));
+		String nodeId = ds.getGatewayNodeId();
+		if (!StringUtil.isEmpty(nodeId)) {
+			GatewayNode node = getBrotherNode(nodeId);
+			if (null == node) {
+				// 服务就是来自该节点，不应该找不到
+				_Logger.error("找不到兄弟节点：" + nodeId);
+			} else {
+				service.setGatewayNode(node);
+			}
+		}
+		return service;
+	}
+
+	DistributedService toDistributedService(ServiceInstance service) {
+		DistributedService ds = DistributedService.valueOf(service);
+		if (null != service.getClientChannel()) {
+			ds.setGatewayNodeId(getSelfNode().getId());
+			ds.setMarks(ds.getMarks() | Service.MARK_DEDICATED_CHANNEL);
+		}
+		return ds;
+	}
+
+	List<ServiceInstance> toServiceInstance(List<DistributedService> services) {
+		return new TransList<ServiceInstance, DistributedService>(services) {
+
+			@Override
+			protected ServiceInstance trans(DistributedService src) {
+				return toServiceInstance(src);
+			}
+		};
+	}
+
+	List<DistributedService> toDistributedService(Collection<ServiceInstance> services) {
+		if (null == services || 0 == services.size()) {
+			return Collections.emptyList();
+		}
+		List<DistributedService> list = new ArrayList<DistributedService>(services.size());
+		for (ServiceInstance s : services) {
+			list.add(toDistributedService(s));
+		}
+		return list;
+	}
+
+	ResultPage<DistributedService> toDistributedService(ResultPage<ServiceInstance> services) {
+		return new TransResultPage<DistributedService, ServiceInstance>(services) {
+
+			@Override
+			protected DistributedService trans(ServiceInstance src) {
+				return toDistributedService(src);
+			}
+		};
+	}
+
+	ResultPage<ServiceInstance> toServiceInstance(ResultPage<DistributedService> services) {
+		return new TransResultPage<ServiceInstance, DistributedService>(services) {
+
+			@Override
+			protected ServiceInstance trans(DistributedService src) {
+				return toServiceInstance(src);
+			}
+		};
 	}
 
 	/**
@@ -334,7 +416,7 @@ public class DistributeManageImpl
 					_Logger.error("缺少内置的Access");
 					return null;
 				}
-				String preUrl = "http://" + getHostName() + ":" + getPort() + "/";
+				String preUrl = getUrls().get(0);
 				SingleServiceInvoker invoker = new SingleServiceInvoker(preUrl, ServiceName.DISTRIBUTED.name, null);
 				invoker.setConnectTimeout(3000);
 				invoker.setReadTimeout(5000);
@@ -383,9 +465,8 @@ public class DistributeManageImpl
 				return ResultPageHelper.empty();
 			}
 			String method = "get_services";
-			PageDataMapper pageDataMapper = new PageDataMapper(ServiceInstance.class, ServiceInstanceMapper.INSTANCE);
-			RemoteResultPage<ServiceInstance> rp = new RemoteResultPage<>(pageDataMapper, invoker, method);
-			return rp;
+			RemoteResultPage<DistributedService> rp = new RemoteResultPage<>(DistributedService.class, invoker, method);
+			return toServiceInstance(rp);
 		}
 
 		void sync(List<GatewayNode> nodes, Collection<ServiceInstance> regServices,
@@ -394,18 +475,16 @@ public class DistributeManageImpl
 			if (null == invoker) {
 				return;
 			}
-			RequestInvokeObject invokeObj = new RequestInvokeObject("sync");
+			RequestInvokeObject invokeObj = new RequestInvokeObject("sync", m_Mappers);
 			if (null != nodes && !nodes.isEmpty()) {
-				DtList list = SimpleDtList.toDtList(nodes, nodes.size(), GatewayNodeMapper.INSTANCE);
-				invokeObj.putParam("nodes", list);
+				invokeObj.putParam("nodes", nodes);
 			}
 			if (null != regServices && !regServices.isEmpty()) {
-				DtList list = SimpleDtList.toDtList(regServices, regServices.size(), ServiceInstanceMapper.INSTANCE);
+				List<DistributedService> list = toDistributedService(regServices);
 				invokeObj.putParam("reg_services", list);
 			}
 			if (null != unregServices && !unregServices.isEmpty()) {
-				DtList list = SimpleDtList.toDtList(unregServices, unregServices.size(),
-						ServiceInstanceMapper.INSTANCE);
+				List<DistributedService> list = toDistributedService(unregServices);
 				invokeObj.putParam("unreg_services", list);
 			}
 			Response resp = invoker.invoke(invokeObj.toDtObject());
@@ -443,6 +522,12 @@ public class DistributeManageImpl
 		public boolean isSelf() {
 			return false;
 		}
+
+		@Override
+		public List<String> getUrls() {
+			String preUrl = "http://" + getHostName() + ":" + getPort() + "/";
+			return Collections.singletonList(preUrl);
+		}
 	}
 
 	static class NodeSelf extends GatewayNodeVo implements GatewayNode {
@@ -463,6 +548,12 @@ public class DistributeManageImpl
 		@Override
 		public boolean isSelf() {
 			return true;
+		}
+
+		@Override
+		public List<String> getUrls() {
+			String preUrl = "http://" + getHostName() + ":" + getPort() + "/";
+			return Collections.singletonList(preUrl);
 		}
 
 		boolean isSame(GatewayNode other) {
@@ -622,8 +713,8 @@ public class DistributeManageImpl
 	}
 
 	@Override
-	public ResultPage<ServiceInstance> getServices() {
-		return m_Gateway.listService(null);
+	public ResultPage<DistributedService> getServices() {
+		return toDistributedService(m_Gateway.listService(null));
 	}
 
 	@Override
@@ -643,6 +734,10 @@ public class DistributeManageImpl
 			nodes.add(b);
 		}
 		return nodes;
+	}
+
+	NodeAgent getBrotherNode(String id) {
+		return m_BrotherNodes.get(id);
 	}
 
 	@Override

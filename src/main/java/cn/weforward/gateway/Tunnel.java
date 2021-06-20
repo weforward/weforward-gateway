@@ -88,6 +88,13 @@ public interface Tunnel {
 	int getMarks();
 
 	/**
+	 * 网关认证
+	 * 
+	 * @return
+	 */
+	String getGatewayAuthType();
+
+	/**
 	 * 是否来自网关内部
 	 * 
 	 * @return
@@ -97,11 +104,11 @@ public interface Tunnel {
 	}
 
 	/**
-	 * 是否来其他网格的转发
+	 * 是否来其他网关的中继请求
 	 * 
 	 * @return
 	 */
-	default boolean isFromMeshForward() {
+	default boolean isRelay() {
 		return false;
 	}
 
@@ -116,8 +123,7 @@ public interface Tunnel {
 	/**
 	 * 输出错误
 	 * 
-	 * @param pipe
-	 *            已对接的微服务管道。未与微服务建立连接时传null
+	 * @param pipe 已对接的微服务管道。未与微服务建立连接时传null
 	 * @param code
 	 * @param msg
 	 */
@@ -134,8 +140,7 @@ public interface Tunnel {
 	 * 微服务管道已初始化
 	 * 
 	 * @param pipe
-	 * @param requestMaxSize
-	 *            请求数据的最大大小，0为不指定
+	 * @param requestMaxSize 请求数据的最大大小，0为不指定
 	 */
 	void requestInit(Pipe pipe, int requestMaxSize);
 

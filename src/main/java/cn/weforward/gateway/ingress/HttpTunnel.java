@@ -155,6 +155,11 @@ public class HttpTunnel implements Tunnel, HeaderOutput, ServerHandler, Runnable
 	public int getMarks() {
 		return m_WfReq.marks;
 	}
+	
+	@Override
+	public String getGatewayAuthType() {
+		return m_Header.getGatewayAuthType();
+	}
 
 	@Override
 	public InputStream mirrorTransferStream() throws IOException {

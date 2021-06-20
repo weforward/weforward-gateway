@@ -60,7 +60,7 @@ public class ServiceInstance implements ServiceExt {
 	/** @see #getRequestMaxSize() */
 	protected int m_RequestMaxSize;
 	/** @see #getMarks() */
-	protected int m_Marks;
+	protected long m_Marks;
 
 	/** @see #getOwner() */
 	protected String m_Owner;
@@ -69,8 +69,10 @@ public class ServiceInstance implements ServiceExt {
 	/** @see #getState() */
 	protected int m_State;
 
-	/** 所在的网格 */
+	/** 所在（所注册）的网格 */
 	protected MeshNode m_MeshNode;
+	/** 所在（所注册）的网关 */
+	protected GatewayNode m_GatewayNode;
 
 	/**
 	 * 与网关通信的channel。<br/>
@@ -103,6 +105,7 @@ public class ServiceInstance implements ServiceExt {
 	 */
 	public ServiceInstance(ServiceInstance foreign) {
 		init((ServiceExt) foreign);
+		m_GatewayNode = foreign.getGatewayNode();
 		m_MeshNode = foreign.getMeshNode();
 	}
 
@@ -241,7 +244,7 @@ public class ServiceInstance implements ServiceExt {
 	}
 
 	@Override
-	public int getMarks() {
+	public long getMarks() {
 		return m_Marks;
 	}
 
@@ -393,7 +396,11 @@ public class ServiceInstance implements ServiceExt {
 		return isMark(MARK_FORWARD_ENABLE);
 	}
 
-	public boolean isMark(int mark) {
+	public boolean isDedicatedChannel() {
+		return isMark(MARK_DEDICATED_CHANNEL);
+	}
+
+	public boolean isMark(long mark) {
 		return mark == (mark & m_Marks);
 	}
 
@@ -409,13 +416,21 @@ public class ServiceInstance implements ServiceExt {
 		return (null == m_MeshNode) ? null : m_MeshNode.getId();
 	}
 
-	/**
-	 * 此服务实例在本网格中
-	 * 
-	 * @return
-	 */
-	public boolean isSelfMesh() {
-		return null == m_MeshNode || m_MeshNode.isSelf();
+//	/**
+//	 * 此服务实例在本网格中
+//	 * 
+//	 * @return
+//	 */
+//	public boolean isSelfMesh() {
+//		return null == m_MeshNode || m_MeshNode.isSelf();
+//	}
+
+	public GatewayNode getGatewayNode() {
+		return m_GatewayNode;
+	}
+
+	public void setGatewayNode(GatewayNode gatewayNode) {
+		m_GatewayNode = gatewayNode;
 	}
 
 	public ClientChannel getClientChannel() {

@@ -16,7 +16,6 @@ import java.net.URLEncoder;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
-import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.zip.CRC32;
 
@@ -30,11 +29,9 @@ import org.slf4j.LoggerFactory;
 
 import cn.weforward.common.crypto.Base64;
 import cn.weforward.common.crypto.Hex;
-import cn.weforward.common.util.ListUtil;
 import cn.weforward.common.util.StringUtil;
 import cn.weforward.gateway.Configure;
 import cn.weforward.gateway.GatewayExt;
-import cn.weforward.gateway.ServiceInstance;
 import cn.weforward.gateway.api.GatewayApis;
 import cn.weforward.gateway.core.MetricsCollecter;
 import cn.weforward.gateway.ops.access.AccessManage;
@@ -315,31 +312,8 @@ public class ServerHandlerSupporter {
 		}
 	}
 
-	/**
-	 * 根据微服务实例所在的网格获取资源链接
-	 * 
-	 * @param serviceName
-	 * @return
-	 */
 	private String getResourcePreUrl(String serviceName) {
-		List<ServiceInstance> services = m_Gateway.listValidService(serviceName);
-		if (ListUtil.isEmpty(services)) {
-			return m_ResourcePreUrl;
-		}
-		ServiceInstance backup = null;
-		for (ServiceInstance s : services) {
-			if (s.isSelfMesh()) {
-				return m_ResourcePreUrl;
-			}
-			backup = s;
-		}
-		if (null == backup) {
-			return m_ResourcePreUrl;
-		}
-		String url = backup.getMeshNode().getUrls().get(0);
-		boolean https = (null != m_ResourcePreUrl && m_ResourcePreUrl.startsWith("https://"));
-		url = genResourcePreUrl(url, https);
-		return url;
+		return m_ResourcePreUrl;
 	}
 
 	public MetricsCollecter getMetricsCollecter() {

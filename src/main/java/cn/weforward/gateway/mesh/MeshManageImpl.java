@@ -38,7 +38,6 @@ import cn.weforward.gateway.PluginListener;
 import cn.weforward.gateway.Pluginable;
 import cn.weforward.gateway.ServiceInstance;
 import cn.weforward.gateway.ServiceListener;
-import cn.weforward.gateway.distribute.ServiceInstanceMapper;
 import cn.weforward.gateway.ops.VoFactory;
 import cn.weforward.gateway.ops.access.AccessManage;
 import cn.weforward.gateway.ops.access.system.MasterKeyVo;
@@ -51,6 +50,7 @@ import cn.weforward.gateway.ops.traffic.TrafficTableVo;
 import cn.weforward.gateway.ops.traffic.TrafficTableVoFactory;
 import cn.weforward.protocol.Access;
 import cn.weforward.protocol.Response;
+import cn.weforward.protocol.Service;
 import cn.weforward.protocol.ServiceName;
 import cn.weforward.protocol.client.ServiceInvoker;
 import cn.weforward.protocol.client.ServiceInvokerFactory;
@@ -313,13 +313,13 @@ public class MeshManageImpl
 	}
 
 	@Override
-	public void syncFromBrother(List<MeshNode> nodes, List<ServiceInstance> regServices,
-			List<ServiceInstance> unregServices, List<Object> updatedObjects) {
+	public void syncFromBrother(List<MeshNode> nodes, List<MeshService> regServices,
+			List<MeshService> unregServices, List<Object> updatedObjects) {
 		// 更新兄弟节点
 		updateBrothers(nodes);
 		// 同步微服务
 		try {
-			m_Gateway.syncServices(nodes.get(0), regServices, unregServices);
+			m_Gateway.syncServices(nodes.get(0), toServiceInstance(regServices), toServiceInstance(unregServices));
 		} catch (Throwable e) {
 			_Logger.error(e.toString(), e);
 		}
@@ -337,6 +337,31 @@ public class MeshManageImpl
 				}
 			}
 		}
+	}
+	
+	List<ServiceInstance> toServiceInstance(List<MeshService> mss) {
+		return new TransList<ServiceInstance, MeshService>(mss) {
+
+			@Override
+			protected ServiceInstance trans(MeshService src) {
+				return src.toServiceInstance();
+			}
+
+		};
+	}
+	
+	List<MeshService> toMeshService(Collection<ServiceInstance> services) {
+		if(null == services || 0 == services.size()) {
+			return Collections.emptyList();
+		}
+		List<MeshService> mss = new ArrayList<MeshService>(services.size());
+		for(ServiceInstance s : services) {
+			MeshService ms = MeshService.valueOf(s);
+			// 默认网格内服务信道都专用的
+			ms.setMarks(ms.getMarks() | Service.MARK_DEDICATED_CHANNEL);
+			mss.add(ms);
+		}
+		return mss;
 	}
 
 	/**
@@ -638,12 +663,11 @@ public class MeshManageImpl
 				invokeObj.putParam("nodes", vos);
 			}
 			if (null != regServices && !regServices.isEmpty()) {
-				DtList list = SimpleDtList.toDtList(regServices, regServices.size(), ServiceInstanceMapper.INSTANCE);
+				List<MeshService> list = toMeshService(regServices);
 				invokeObj.putParam("reg_services", list);
 			}
 			if (null != unregServices && !unregServices.isEmpty()) {
-				DtList list = SimpleDtList.toDtList(unregServices, unregServices.size(),
-						ServiceInstanceMapper.INSTANCE);
+				List<MeshService> list = toMeshService(unregServices);
 				invokeObj.putParam("unreg_services", list);
 			}
 			if (null != changes) {

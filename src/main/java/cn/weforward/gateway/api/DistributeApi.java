@@ -13,13 +13,13 @@ package cn.weforward.gateway.api;
 import java.util.List;
 
 import cn.weforward.common.ResultPage;
-import cn.weforward.gateway.ServiceInstance;
+import cn.weforward.gateway.GatewayNode;
 import cn.weforward.gateway.distribute.DistributeManage;
-import cn.weforward.gateway.distribute.GatewayNode;
+import cn.weforward.gateway.distribute.DistributedService;
 import cn.weforward.gateway.distribute.GatewayNodeMapper;
-import cn.weforward.gateway.distribute.ServiceInstanceMapper;
 import cn.weforward.protocol.Header;
 import cn.weforward.protocol.ServiceName;
+import cn.weforward.protocol.support.BeanObjectMapper;
 import cn.weforward.protocol.support.PageData;
 import cn.weforward.protocol.support.PageDataMapper;
 import cn.weforward.protocol.support.SimpleObjectMapperSet;
@@ -40,7 +40,7 @@ public class DistributeApi extends AbstractGatewayApi {
 		super();
 
 		m_Mappers = new SimpleObjectMapperSet();
-		m_Mappers.register(ServiceInstanceMapper.INSTANCE);
+		m_Mappers.register(BeanObjectMapper.getInstance(DistributedService.class));
 		m_Mappers.register(GatewayNodeMapper.INSTANCE);
 		PageDataMapper pageDataMapper = new PageDataMapper(m_Mappers);
 		m_Mappers.register(pageDataMapper);
@@ -68,8 +68,8 @@ public class DistributeApi extends AbstractGatewayApi {
 		@Override
 		Void execute(Header reqHeader, FriendlyObject params) throws ApiException {
 			List<GatewayNode> nodes = params.getList("nodes", GatewayNode.class, getMappers());
-			List<ServiceInstance> regs = params.getList("reg_services", ServiceInstance.class, getMappers());
-			List<ServiceInstance> unregs = params.getList("unreg_services", ServiceInstance.class, getMappers());
+			List<DistributedService> regs = params.getList("reg_services", DistributedService.class, getMappers());
+			List<DistributedService> unregs = params.getList("unreg_services", DistributedService.class, getMappers());
 
 			m_DistributeManage.syncFromBrother(nodes, regs, unregs);
 			return null;
@@ -80,7 +80,7 @@ public class DistributeApi extends AbstractGatewayApi {
 
 		@Override
 		PageData execute(Header reqHeader, FriendlyObject params) throws ApiException {
-			ResultPage<ServiceInstance> services = m_DistributeManage.getServices();
+			ResultPage<DistributedService> services = m_DistributeManage.getServices();
 			if (services.getCount() > 0) {
 				int page = params.getInt("page", 1);
 				int pageSize = params.getInt("page_size", 1000);

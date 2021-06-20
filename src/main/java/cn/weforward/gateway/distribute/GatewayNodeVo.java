@@ -10,11 +10,16 @@
  */
 package cn.weforward.gateway.distribute;
 
+import java.util.List;
+
+import cn.weforward.gateway.GatewayNode;
+
 public class GatewayNodeVo {
 
 	public String id;
 	public String hostName;
 	public int port;
+	public List<String> urls;
 
 	public GatewayNodeVo() {
 
@@ -58,5 +63,13 @@ public class GatewayNodeVo {
 
 	public void setPort(int port) {
 		this.port = port;
+	}
+
+	public List<String> getUrls() {
+		return urls;
+	}
+
+	public void setUrls(List<String> urls) {
+		this.urls = urls;
 	}
 }

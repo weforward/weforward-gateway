@@ -10,6 +10,7 @@
  */
 package cn.weforward.gateway.distribute;
 
+import cn.weforward.gateway.GatewayNode;
 import cn.weforward.gateway.Pluginable;
 
 /**

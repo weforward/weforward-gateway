@@ -10,39 +10,40 @@
  */
 package cn.weforward.gateway.distribute;
 
+import cn.weforward.gateway.ServiceInstance;
+import cn.weforward.protocol.gateway.vo.ServiceExtVo;
+import cn.weforward.protocol.ops.ServiceExt;
+
 /**
- * 网关节点
+ * 分布的微服务实例
  * 
- * @author zhangpengji
+ * @author smily
  *
  */
-public interface GatewayNode {
-	
-	/**
-	 * 节点标识（服务器id）
-	 * 
-	 * @return
-	 */
-	String getId();
+public class DistributedService extends ServiceExtVo {
 
-	/**
-	 * 节点的域名（ip地址）
-	 * 
-	 * @return
-	 */
-	String getHostName();
+	public String gatewayNodeId;
 
-	/**
-	 * 节点的端口
-	 * 
-	 * @return
-	 */
-	int getPort();
+	public DistributedService() {
 
-	/**
-	 * 节点是否为当前网关
-	 * 
-	 * @return
-	 */
-	boolean isSelf();
+	}
+
+	public DistributedService(ServiceInstance service) {
+		super((ServiceExt) service);
+	}
+
+	public static DistributedService valueOf(ServiceInstance service) {
+		if (null == service) {
+			return null;
+		}
+		return new DistributedService(service);
+	}
+
+	public String getGatewayNodeId() {
+		return gatewayNodeId;
+	}
+
+	public void setGatewayNodeId(String gatewayNodeId) {
+		this.gatewayNodeId = gatewayNodeId;
+	}
 }

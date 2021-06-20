@@ -23,9 +23,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import cn.weforward.common.NameItem;
+import cn.weforward.common.execption.BusyException;
 import cn.weforward.common.util.LruCache;
 import cn.weforward.common.util.StringUtil;
 import cn.weforward.common.util.TransList;
+import cn.weforward.gateway.AccessLoaderExt;
 import cn.weforward.gateway.Configure;
 import cn.weforward.gateway.ServiceInstance;
 import cn.weforward.gateway.StreamTunnel;
@@ -284,6 +286,10 @@ public class ServiceInstanceBalance {
 	Access getInternalAccess() {
 		return m_Gateway.m_AccessManage.getInternalAccess();
 	}
+	
+	AccessLoaderExt getAccessLoaderExt() {
+		return m_Gateway.m_AccessManage;
+	}
 
 	// int getEndpointValids(int max) {
 	// int valids = m_EndpointValids;
@@ -308,13 +314,9 @@ public class ServiceInstanceBalance {
 	// }
 	
 	ServiceEndpoint get(String no, String version) throws BalanceException {
-		return get(no, version, Collections.emptyList(), false);
+		return get(no, version, Collections.emptyList());
 	}
 	
-	ServiceEndpoint get(String no, String version, List<String> excludeNos) throws BalanceException {
-		return get(no, version, excludeNos, false);
-	}
-
 	/**
 	 * 根据负载均衡规则获取微服务实例端点。
 	 * <p>
@@ -327,7 +329,7 @@ public class ServiceInstanceBalance {
 	 * @see #free(ServiceEndpoint, int)
 	 * @throws BalanceException
 	 */
-	ServiceEndpoint get(String no, String version, List<String> excludeNos, boolean onlySelfMesh) throws BalanceException {
+	ServiceEndpoint get(String no, String version, List<String> excludeNos) throws BalanceException {
 		int concurrent = m_Concurrent.get();
 		int quota = getQuotas().getQuota(m_Name, concurrent);
 		if (concurrent > quota) {
@@ -372,9 +374,6 @@ public class ServiceInstanceBalance {
 				if ((onlyBackup && !best.isBackup()) || best.matchNos(excludeNos)) {
 					throw BalanceException.exclude(m_Name, String.valueOf(best));
 				}
-				if (onlySelfMesh && !best.isSelfMesh()) {
-					throw BalanceException.noSelfMesh(m_Name, String.valueOf(best));
-				}
 				// best.use();
 				use(best);
 				return best;
@@ -415,9 +414,6 @@ public class ServiceInstanceBalance {
 				continue;
 			}
 			if (element.matchNos(excludeNos)) {
-				continue;
-			}
-			if (onlySelfMesh && !element.isSelfMesh()) {
 				continue;
 			}
 
@@ -464,9 +460,6 @@ public class ServiceInstanceBalance {
 					continue;
 				}
 				if (element.matchNos(excludeNos)) {
-					continue;
-				}
-				if (onlySelfMesh && !element.isSelfMesh()) {
 					continue;
 				}
 
@@ -523,7 +516,7 @@ public class ServiceInstanceBalance {
 			// Quotas quotas = m_Quotas;
 			// if (null == quotas) {
 			err = "全忙{fail:" + failCount + ",over:" + overloadCount + ",exclude:" + excludeNos + ",backup:" + onlyBackup
-					+ ",mesh:" + onlySelfMesh + ",res:" + Arrays.toString(eps) + "}";
+					+ ",res:" + Arrays.toString(eps) + "}";
 			// } else {
 			// err = "全忙{fail:" + failCount + ",over:" + overloadCount +
 			// ",quotas:" + quotas
@@ -689,7 +682,7 @@ public class ServiceInstanceBalance {
 		forwardBridger.connect(ep);
 	}
 	
-	public void jointByMesh(Tunnel tunnel) {
+	public void jointByRelay(Tunnel tunnel) {
 		String serviceNo = tunnel.getHeader().getServiceNo();
 		ServiceEndpoint ep;
 		try {
@@ -705,11 +698,6 @@ public class ServiceInstanceBalance {
 			tunnel.responseError(null, code, "微服务[" + m_Name + "]网格中继失败：" + e.getKeyword());
 			return;
 		}
-		if (null != ep.getService().getMeshNode()) {
-			tunnel.responseError(null, WeforwardException.CODE_INVOKE_DENIED,
-					"微服务实例[" + ep.getService().toStringNameNo() + "]不在此网格");
-			return;
-		}
 		ep.connect(tunnel, false);
 		return;
 	}
@@ -721,7 +709,7 @@ public class ServiceInstanceBalance {
 		}
 		ServiceEndpoint ep;
 		try {
-			ep = get(null, null, null, true);
+			ep = get(null, null, null);
 		} catch (BalanceException e) {
 			_Logger.warn("微服务[" + m_Name + "]忙：" + e.getMessage());
 			int code = (e instanceof QuotasException) ? StreamTunnel.CODE_UNAVAILABLE

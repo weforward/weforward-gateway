@@ -248,9 +248,9 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 		// tunnel.responseError(null, WeforwardException.CODE_UNREADY, "网关未就绪");
 		// return;
 		// }
-		// 网格中继
-		if(tunnel.isFromMeshForward()) {
-			jointMesh(tunnel);
+		// 中继
+		if(tunnel.isRelay()) {
+			jointByRelay(tunnel);
 			return;
 		}
 		
@@ -296,14 +296,14 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 		bridger.connect();
 	}
 	
-	private void jointMesh(Tunnel tunnel) {
+	private void jointByRelay(Tunnel tunnel) {
 		String serviceName = tunnel.getHeader().getService();
 		ServiceInstanceBalance balance = m_ServiceBalances.get(serviceName);
 		if (null == balance) {
 			tunnel.responseError(null, WeforwardException.CODE_SERVICE_NOT_FOUND, "服务不存在：" + serviceName);
 			return;
 		}
-		balance.jointByMesh(tunnel);
+		balance.jointByRelay(tunnel);
 	}
 
 	@Override
