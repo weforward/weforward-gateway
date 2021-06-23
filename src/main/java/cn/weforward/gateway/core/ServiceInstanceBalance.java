@@ -699,7 +699,6 @@ public class ServiceInstanceBalance {
 			return;
 		}
 		ep.connect(tunnel, false);
-		return;
 	}
 
 	public void joint(StreamTunnel tunnel) {
@@ -709,12 +708,24 @@ public class ServiceInstanceBalance {
 		}
 		ServiceEndpoint ep;
 		try {
-			ep = get(null, null, null);
+			ep = get(tunnel.getServiceNo(), null, null);
 		} catch (BalanceException e) {
 			_Logger.warn("微服务[" + m_Name + "]忙：" + e.getMessage());
 			int code = (e instanceof QuotasException) ? StreamTunnel.CODE_UNAVAILABLE
 					: StreamTunnel.CODE_INTERNAL_ERROR;
 			tunnel.responseError(null, code, "微服务[" + m_Name + "]忙：" + e.getKeyword());
+			return;
+		}
+		ep.connect(tunnel);
+	}
+	
+	public void jointByRelay(StreamTunnel tunnel) {
+		ServiceEndpoint ep;
+		try {
+			ep = select(tunnel.getServiceNo());
+		} catch (BalanceException e) {
+			_Logger.warn(e.toString());
+			tunnel.responseError(null, StreamTunnel.CODE_UNAVAILABLE, "微服务[" + m_Name + "]网格中继失败：" + e.getKeyword());
 			return;
 		}
 		ep.connect(tunnel);

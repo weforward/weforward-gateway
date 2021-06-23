@@ -157,11 +157,6 @@ public class HttpTunnel implements Tunnel, HeaderOutput, ServerHandler, Runnable
 	}
 	
 	@Override
-	public String getGatewayAuthType() {
-		return m_Header.getGatewayAuthType();
-	}
-
-	@Override
 	public InputStream mirrorTransferStream() throws IOException {
 		return m_Context.mirrorRequestStream(m_WfReq.nextPosition);
 	}

@@ -318,6 +318,10 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 			tunnel.responseError(null, StreamTunnel.CODE_NOT_FOUND, "服务不存在：" + serviceName);
 			return;
 		}
+		if (tunnel.isRelay()) {
+			balance.jointByRelay(tunnel);
+			return;
+		}
 		balance.joint(tunnel);
 	}
 

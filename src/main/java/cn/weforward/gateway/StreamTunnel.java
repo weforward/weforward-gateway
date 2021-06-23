@@ -45,6 +45,13 @@ public interface StreamTunnel {
 	String getServiceName();
 
 	/**
+	 * 服务实例编号
+	 * 
+	 * @return
+	 */
+	String getServiceNo();
+
+	/**
 	 * 资源标识
 	 * 
 	 * @return
@@ -66,6 +73,24 @@ public interface StreamTunnel {
 	long getLength();
 
 	/**
+	 * 网关认证类型
+	 * 
+	 * @return
+	 */
+	default String getGatewayAuthType() {
+		return null;
+	}
+
+	/**
+	 * 是否中继
+	 * 
+	 * @return
+	 */
+	default boolean isRelay() {
+		return false;
+	}
+
+	/**
 	 * 微服务管道的请求输出流已就绪
 	 * 
 	 * @param pipe
@@ -76,10 +101,8 @@ public interface StreamTunnel {
 	 * 微服务管道的响应输入流已就绪
 	 * 
 	 * @param pipe
-	 * @param httpCode
-	 *            当pipe使用http协议时，传入微服务端返回的http状态码。当不为0时，将忽略code参数
-	 * @param errCode
-	 *            错误码，如:{@linkplain #CODE_NOT_FOUND}
+	 * @param httpCode 当pipe使用http协议时，传入微服务端返回的http状态码。当不为0时，将忽略code参数
+	 * @param errCode  错误码，如:{@linkplain #CODE_NOT_FOUND}
 	 */
 	void responseReady(StreamPipe pipe, int httpCode, int errCode);
 
@@ -93,10 +116,8 @@ public interface StreamTunnel {
 	/**
 	 * 输出错误
 	 * 
-	 * @param pipe
-	 *            已对接的<code>StreamPipe</code>。未与建立连接时传null
-	 * @param code
-	 *            错误码，如:{@linkplain #CODE_NOT_FOUND}
+	 * @param pipe 已对接的<code>StreamPipe</code>。未与建立连接时传null
+	 * @param code 错误码，如:{@linkplain #CODE_NOT_FOUND}
 	 * @param msg
 	 */
 	void responseError(StreamPipe pipe, int code, String msg);

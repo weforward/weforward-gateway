@@ -20,14 +20,15 @@ import cn.weforward.common.util.StringUtil;
 import cn.weforward.gateway.Configure;
 import cn.weforward.gateway.StreamPipe;
 import cn.weforward.gateway.StreamTunnel;
-import cn.weforward.gateway.util.OverloadLimit.OverloadLimitToken;
 import cn.weforward.gateway.util.CloseUtil;
 import cn.weforward.gateway.util.OverloadLimit;
+import cn.weforward.gateway.util.OverloadLimit.OverloadLimitToken;
 import cn.weforward.protocol.Header;
 import cn.weforward.protocol.aio.ServerHandler;
 import cn.weforward.protocol.aio.http.HttpConstants;
 import cn.weforward.protocol.aio.http.HttpContext;
 import cn.weforward.protocol.aio.http.HttpHeaders;
+import cn.weforward.protocol.exception.AuthException;
 
 /**
  * 基于Http的<code>StreamTunnel</code>实现
@@ -57,6 +58,7 @@ public class HttpStreamTunnel implements StreamTunnel, ServerHandler {
 	// 响应输出流
 	volatile OutputStream m_Output;
 	String m_ServiceName;
+	String m_ServiceNo;
 	String m_ResourceId;
 	String m_ContentType;
 	long m_Length;
@@ -87,8 +89,14 @@ public class HttpStreamTunnel implements StreamTunnel, ServerHandler {
 	public long getLength() {
 		return m_Length;
 	}
-
-	void parseHeader() {
+	
+	@Override
+	public String getServiceNo() {
+		// TODO
+		return m_ServiceNo;
+	}
+	
+	void requestHeader0() {
 		synchronized (this) {
 			if (m_Schedule >= SCHEDULE_BEGIN) {
 				return;
@@ -114,6 +122,15 @@ public class HttpStreamTunnel implements StreamTunnel, ServerHandler {
 			m_LimitToken = token;
 		}
 		
+		if(!parseRequest()) {
+			return;
+		}
+
+		// joint过程不会依赖外部系统，直接在netty工作线程处理
+		m_Supporter.getGateway().joint(this);
+	}
+	
+	protected boolean parseRequest() {
 		String query = m_Context.getQueryString();
 		StreamResourceToken token;
 		try {
@@ -121,11 +138,11 @@ public class HttpStreamTunnel implements StreamTunnel, ServerHandler {
 		} catch (IllegalArgumentException e) {
 			_Logger.error("uri异常:" + StringUtil.limit(query, 200), e);
 			responseError(HttpConstants.BAD_REQUEST, "参数异常");
-			return;
+			return false;
 		}
 		if (token.isExpire()) {
 			responseError(HttpConstants.BAD_REQUEST, "链接已过期");
-			return;
+			return false;
 		}
 		m_ServiceName = token.getServiceName();
 		m_ResourceId = token.getResourceId();
@@ -142,9 +159,7 @@ public class HttpStreamTunnel implements StreamTunnel, ServerHandler {
 				}
 			}
 		}
-
-		// joint过程不会依赖外部系统，直接在netty工作线程处理
-		m_Supporter.getGateway().joint(this);
+		return true;
 	}
 
 	@Override
@@ -297,6 +312,8 @@ public class HttpStreamTunnel implements StreamTunnel, ServerHandler {
 		String msg;
 		if (e instanceof IOException) {
 			msg = "网络错误";
+		} else if (e instanceof AuthException) {
+			msg = e.getMessage();
 		} else {
 			msg = "网关内部错误";
 		}
@@ -357,7 +374,7 @@ public class HttpStreamTunnel implements StreamTunnel, ServerHandler {
 			HttpTunnel._Logger.trace(m_Context.getUri() + " request header.");
 		}
 
-		parseHeader();
+		requestHeader0();
 	}
 
 	@Override

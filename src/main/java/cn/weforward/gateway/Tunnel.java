@@ -88,13 +88,6 @@ public interface Tunnel {
 	int getMarks();
 
 	/**
-	 * 网关认证
-	 * 
-	 * @return
-	 */
-	String getGatewayAuthType();
-
-	/**
 	 * 是否来自网关内部
 	 * 
 	 * @return

@@ -20,6 +20,7 @@ import cn.weforward.common.util.IpRanges;
 import cn.weforward.common.util.StringUtil;
 import cn.weforward.common.util.VersionUtil;
 import cn.weforward.gateway.Configure;
+import cn.weforward.protocol.Header;
 import cn.weforward.protocol.aio.Headers;
 import cn.weforward.protocol.aio.ServerContext;
 import cn.weforward.protocol.aio.ServerHandler;
@@ -270,7 +271,7 @@ public class HttpGatewayServer implements ServerHandlerFactory {
 			ctx.disconnect();
 			return null;
 		}
-		if (m_StreamUriPattern.match(uri)) {
+		if (m_StreamUriPattern.match(uri) || Header.CHANNEL_STREAM.equals(ctx.getRequestHeaders().get(HttpConstants.WF_CHANNEL))) {
 			return openStreamTunnel((HttpContext) ctx);
 		}
 		if (METHOD_POST == method && m_RpcUriPattern.match(uri)) {
@@ -298,6 +299,13 @@ public class HttpGatewayServer implements ServerHandlerFactory {
 	}
 
 	ServerHandler openStreamTunnel(HttpContext ctx) throws IOException {
+		if (checkRelay(ctx)) {
+			return new HttpStreamRelayTunnel(ctx, m_Supporter);
+		}
 		return new HttpStreamTunnel(ctx, m_Supporter);
+	}
+	
+	ServerHandler openStreamRelayTunnel(HttpContext ctx) throws IOException {
+		return new HttpStreamRelayTunnel(ctx, m_Supporter);
 	}
 }

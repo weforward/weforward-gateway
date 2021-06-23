@@ -138,8 +138,12 @@ public class ServiceEndpointImpl extends ServiceEndpoint {
 
 	@Override
 	protected StreamPipe openPipe(StreamTunnel tunnel) {
+		ClientChannel channel = m_Service.getClientChannel();
+		if (null == channel) {
+			channel = getHttpClientFactory();
+		}
 		EndpointStreamPipe pipe = new EndpointStreamPipe(tunnel, getEndpointUrl(), getService());
-		pipe.open(getHttpClientFactory(), Configure.getInstance().getServiceMaxReadTimeout());
+		pipe.open(channel, Configure.getInstance().getServiceMaxReadTimeout());
 		return pipe;
 	}
 
@@ -258,7 +262,7 @@ public class ServiceEndpointImpl extends ServiceEndpoint {
 		}
 
 		void open(ClientChannel channel, int timeout) {
-			String preRelayType = m_Tunnel.getGatewayAuthType();
+			String preRelayType = m_Tunnel.getHeader().getGatewayAuthType();
 			String currRelayType = m_EndpointUrls.get(0).relayType;
 			if (!StringUtil.isEmpty(preRelayType) && !StringUtil.isEmpty(currRelayType)) {
 				if (Header.GATEWAY_AUTH_TYPE_MESH_RELAY.equals(preRelayType)
@@ -388,9 +392,9 @@ public class ServiceEndpointImpl extends ServiceEndpoint {
 					channel = Header.CHANNEL_RPC;
 				}
 				header.setChannel(channel);
-				header.setServiceNo(service.getNo());
 				if (!StringUtil.isEmpty(m_Url.relayType)) {
 					// 通过网关中继
+					header.setServiceNo(service.getNo());
 					getGatewayAuther().generate(m_Url.relayType, header);
 				}
 
@@ -1058,6 +1062,18 @@ public class ServiceEndpointImpl extends ServiceEndpoint {
 		}
 
 		void open(ClientChannel channel, int timeout) {
+			String preRelayType = m_Tunnel.getGatewayAuthType();
+			String currRelayType = m_EndpointUrls.get(0).relayType;
+			if (!StringUtil.isEmpty(preRelayType) && !StringUtil.isEmpty(currRelayType)) {
+				if (Header.GATEWAY_AUTH_TYPE_MESH_RELAY.equals(preRelayType)
+						&& Header.GATEWAY_AUTH_TYPE_RELAY.equals(currRelayType)) {
+					// 仅支持Mesh-Forward -> Forward
+				} else {
+					responseError(StreamTunnel.CODE_ILLEGAL_ARGUMENT,
+							"不支持中继嵌套：" + preRelayType + " -> " + currRelayType, BalanceElement.STATE_OK);
+					return;
+				}
+			}
 			try {
 				String id = URLEncoder.encode(m_Tunnel.getResourceId(), Header.CHARSET_DEFAULT);
 				String url = m_Url.url + "?id=" + id;
@@ -1104,6 +1120,14 @@ public class ServiceEndpointImpl extends ServiceEndpoint {
 				long length = m_Tunnel.getLength();
 				if (0 != length) {
 					writeHeader(this, HttpConstants.CONTENT_LENGTH, String.valueOf(length));
+				}
+				if (!StringUtil.isEmpty(m_Url.relayType)) {
+					// 通过网关中继
+					ServiceInstance service = getService();
+					Header header = new Header(service.getName());
+					header.setServiceNo(service.getNo());
+					getGatewayAuther().generate(m_Url.relayType, header);
+					writeHeader(this, header);
 				}
 				/* 转发请求内容 */
 				m_Output = m_Context.openRequestWriter();
@@ -1288,7 +1312,10 @@ public class ServiceEndpointImpl extends ServiceEndpoint {
 			if (_Logger.isTraceEnabled()) {
 				_Logger.trace(getService().getName() + " established.");
 			}
-			if (m_Context != context) {
+			if (null == m_Context) {
+				// websocket会在ClientChannel.request中，回调此接口
+				m_Context = context;
+			} else if (m_Context != context) {
 				// 不会吧，什么情况！？
 				_Logger.error("context不一致：" + m_Context + " != " + context);
 			}

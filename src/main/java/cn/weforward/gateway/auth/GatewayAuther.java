@@ -36,7 +36,7 @@ public class GatewayAuther {
 	 * @throws AuthException
 	 */
 	public void generate(String type, Header requestHeader) throws AuthException {
-		// TODO Header.GATEWAY_AUTH_TYPE_MESH_FORWARD 网关转发不应该用内置密钥
+		// TODO Header.GATEWAY_AUTH_TYPE_MESH_RELAY 网格中继不应该用内置密钥
 		try {
 			MessageDigest md = MessageDigest.getInstance("SHA-256");
 			Access internalAccess = m_AccessLoader.getInternalAccess();
@@ -91,7 +91,7 @@ public class GatewayAuther {
 			throw new AuthException(e);
 		}
 		if (!StringUtil.eq(verifySign, sign)) {
-			throw new AuthException(AuthException.CODE_AUTH_FAIL, "代理转发验证失败：" + verifySign + " != " + sign);
+			throw new AuthException(AuthException.CODE_AUTH_FAIL, "中继验证失败：" + verifySign + " != " + sign);
 		}
 	}
 }
