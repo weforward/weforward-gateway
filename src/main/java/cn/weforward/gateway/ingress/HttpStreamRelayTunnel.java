@@ -19,8 +19,15 @@ import cn.weforward.protocol.exception.AuthException;
  */
 public class HttpStreamRelayTunnel extends HttpStreamTunnel {
 
+	String m_GatewayAuthType;
+
 	public HttpStreamRelayTunnel(HttpContext ctx, ServerHandlerSupporter supporter) {
 		super(ctx, supporter);
+	}
+
+	@Override
+	public String getGatewayAuthType() {
+		return m_GatewayAuthType;
 	}
 
 	@Override
@@ -46,6 +53,7 @@ public class HttpStreamRelayTunnel extends HttpStreamTunnel {
 			return false;
 		}
 		m_ServiceNo = header.getServiceNo();
+		m_GatewayAuthType = header.getGatewayAuthType();
 		DictionaryExt<String, String> params = QueryStringParser.toParams(m_Context.getQueryString());
 		String id = params.get("id");
 		if (StringUtil.isEmpty(id)) {
