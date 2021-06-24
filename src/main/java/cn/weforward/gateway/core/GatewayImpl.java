@@ -368,8 +368,14 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 
 	protected void registerServiceInner(ServiceInstance service, boolean foreign) {
 		ServiceInstance exist = m_Services.get(service.getId());
-		if (null != exist && exist.getHeartbeatMills() >= service.getHeartbeatMills()) {
-			return;
+		if (null != exist) {
+			if (exist.getHeartbeatMills() >= service.getHeartbeatMills()) {
+				return;
+			}
+			if (foreign && null != exist.getClientChannel() && !exist.isTimeout()) {
+				// 原实例与本网关有建立专用信道，故保留原实例
+				return;
+			}
 		}
 		m_Services.put(service.getId(), service);
 
