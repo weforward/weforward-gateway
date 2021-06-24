@@ -38,6 +38,12 @@ public interface Pipe {
 	
 	/** @see Response#getResourceService() */
 	String getResourceService();
+	
+	/** @see Response#getResourceServiceNo() */
+	String getResourceServiceNo();
+	
+	/** @see Response#getResourceUrl() */
+	String getResourceUrl();
 
 	/** @see Response#getForwardTo() */
 	String getForwardTo();

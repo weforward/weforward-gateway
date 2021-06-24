@@ -338,6 +338,20 @@ public class ServiceEndpointImpl extends ServiceEndpoint {
 			}
 			return getService().getName();
 		}
+		
+		@Override
+		public String getResourceServiceNo() {
+			if (!StringUtil.isEmpty(m_WfResp.resService)) {
+				// 与resService配套使用
+				return m_WfResp.resServiceNo;
+			}
+			return getService().getNo();
+		}
+		
+		@Override
+		public String getResourceUrl() {
+			return m_WfResp.resUrl;
+		}
 
 		@Override
 		public String getForwardTo() {

@@ -92,7 +92,6 @@ public class HttpStreamTunnel implements StreamTunnel, ServerHandler {
 	
 	@Override
 	public String getServiceNo() {
-		// TODO
 		return m_ServiceNo;
 	}
 	
@@ -145,6 +144,7 @@ public class HttpStreamTunnel implements StreamTunnel, ServerHandler {
 			return false;
 		}
 		m_ServiceName = token.getServiceName();
+		m_ServiceNo = token.getServiceNo();
 		m_ResourceId = token.getResourceId();
 
 		HttpHeaders headers = m_Context.getRequestHeaders();

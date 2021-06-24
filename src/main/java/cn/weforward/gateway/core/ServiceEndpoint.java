@@ -532,6 +532,8 @@ public abstract class ServiceEndpoint extends BalanceElement {
 		String resId;
 		long resExpire;
 		String resService;
+		String resServiceNo;
+		String resUrl;
 		String forwardTo;
 		int marks;
 		/** 是否找到wf_resp节点 */
@@ -573,6 +575,10 @@ public abstract class ServiceEndpoint extends BalanceElement {
 					this.resExpire = ((Number) v).longValue();
 				} else if (ResponseConstants.RESOURCE_SERVICE.equals(k)) {
 					this.resService = (String) v;
+				} else if (ResponseConstants.RESOURCE_SERVICE_NO.equals(k)) {
+					this.resServiceNo = (String) v;
+				} else if (ResponseConstants.RESOURCE_URL.equals(k)) {
+					this.resUrl = (String) v;
 				} else if (ResponseConstants.FORWARD_TO.equals(k)) {
 					this.forwardTo = (String) v;
 				} else if (ResponseConstants.MARKS.equals(k)) {

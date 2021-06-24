@@ -346,6 +346,16 @@ class ForwardBridger {
 		}
 		
 		@Override
+		public String getResourceServiceNo() {
+			return m_Pipe.getResourceServiceNo();
+		}
+
+		@Override
+		public String getResourceUrl() {
+			return m_Pipe.getResourceUrl();
+		}
+		
+		@Override
 		public String getForwardTo() {
 			return m_Pipe.getForwardTo();
 		}

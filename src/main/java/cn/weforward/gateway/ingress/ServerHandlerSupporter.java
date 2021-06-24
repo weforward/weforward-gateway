@@ -29,6 +29,12 @@ import org.slf4j.LoggerFactory;
 
 import cn.weforward.common.crypto.Base64;
 import cn.weforward.common.crypto.Hex;
+import cn.weforward.common.json.JsonObject;
+import cn.weforward.common.json.JsonPair;
+import cn.weforward.common.json.JsonUtil;
+import cn.weforward.common.json.SimpleJsonObject;
+import cn.weforward.common.json.StringInput;
+import cn.weforward.common.json.StringOutput;
 import cn.weforward.common.util.StringUtil;
 import cn.weforward.gateway.Configure;
 import cn.weforward.gateway.GatewayExt;
@@ -113,7 +119,7 @@ public class ServerHandlerSupporter {
 
 	private String genResourcePreUrl(String url, boolean https) {
 		StringBuilder sb = new StringBuilder(100);
-		if(https && url.startsWith("http://")) {
+		if (https && url.startsWith("http://")) {
 			sb.append("https://").append(url.substring(7));
 		} else {
 			sb.append(url);
@@ -246,32 +252,40 @@ public class ServerHandlerSupporter {
 			cipher.init(Cipher.DECRYPT_MODE, m_ResourceTokenKey, m_ResourceTokenIv);
 			byte[] plain = cipher.doFinal(content, 0, content.length - 4);
 			// 校验crc
-			int _crc32 = ((content[content.length - 4] << 24) & 0xFF000000);
-			_crc32 |= ((content[content.length - 3] << 16) & 0xFF0000);
-			_crc32 |= ((content[content.length - 2] << 8) & 0xFF00);
-			_crc32 |= ((content[content.length - 1]) & 0xFF);
+			int crc32Verify = ((content[content.length - 4] << 24) & 0xFF000000);
+			crc32Verify |= ((content[content.length - 3] << 16) & 0xFF0000);
+			crc32Verify |= ((content[content.length - 2] << 8) & 0xFF00);
+			crc32Verify |= ((content[content.length - 1]) & 0xFF);
 			CRC32 crc = new CRC32();
 			crc.update(plain);
 			int crc32 = (int) crc.getValue();
-			if (_crc32 != crc32) {
-				throw new IllegalArgumentException("token校验crc失败：" + _crc32 + " != " + crc32);
+			if (crc32Verify != crc32) {
+				throw new IllegalArgumentException("token校验crc失败：" + crc32Verify + " != " + crc32);
 			}
-			String text = new String(plain, 0, plain.length, "utf-8");
-			int bi = 0;
-			int ei = text.indexOf('|');
-			String service = text.substring(bi, ei);
-			bi = ei + 1;
-			ei = text.indexOf('|', bi);
-			long expire = Long.parseLong(text.substring(bi, ei));
-			String resId = text.substring(ei + 1);
+			String json = new String(plain, 0, plain.length, "utf-8");
+			JsonObject jo = (JsonObject) JsonUtil.parse(new StringInput(json), null);
+			String service = getValue(jo, "s");
+			String serviceNo = getValue(jo, "no");
+			Number expire = getValue(jo, "exp");
+			String resId = getValue(jo, "id");
 			StreamResourceToken token = new StreamResourceToken();
 			token.setServiceName(service);
+			token.setServiceNo(serviceNo);
 			token.setResourceId(resId);
-			token.setExpire(expire);
+			token.setExpire(expire.longValue());
 			return token;
 		} catch (Throwable e) {
 			throw new IllegalArgumentException("解析token失败:" + tokenValue, e);
 		}
+	}
+
+	@SuppressWarnings("unchecked")
+	private static <E> E getValue(JsonObject obj, String key) {
+		JsonPair pair = obj.property(key);
+		if (null == pair) {
+			return null;
+		}
+		return (E) pair.getValue();
 	}
 
 	/**
@@ -288,9 +302,14 @@ public class ServerHandlerSupporter {
 			return null;
 		}
 		try {
-			StringBuilder sb = new StringBuilder();
-			sb.append(service).append('|').append(resExpire).append('|').append(resId);
-			byte[] plain = sb.toString().getBytes("utf-8");
+			SimpleJsonObject jo = new SimpleJsonObject();
+			jo.add("s", service);
+			jo.add("no", token.getServiceNo());
+			jo.add("exp", resExpire);
+			jo.add("id", resId);
+			StringOutput out = new StringOutput();
+			JsonUtil.format(jo, out);
+			byte[] plain = out.toString().getBytes("utf-8");
 			// 加密
 			Cipher cipher = Cipher.getInstance("AES/OFB/NoPadding");
 			cipher.init(Cipher.ENCRYPT_MODE, m_ResourceTokenKey, m_ResourceTokenIv);

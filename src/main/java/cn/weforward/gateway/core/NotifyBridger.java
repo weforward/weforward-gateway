@@ -524,6 +524,16 @@ class NotifyBridger {
 		public String getResourceService() {
 			return null;
 		}
+		
+		@Override
+		public String getResourceServiceNo() {
+			return null;
+		}
+
+		@Override
+		public String getResourceUrl() {
+			return null;
+		}
 
 		@Override
 		public String getForwardTo() {

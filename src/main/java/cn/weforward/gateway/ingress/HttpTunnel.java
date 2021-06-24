@@ -340,18 +340,19 @@ public class HttpTunnel implements Tunnel, HeaderOutput, ServerHandler, Runnable
 
 		// 组织wf_resp
 		WfResp wfResp = createWfResp(0, "");
+		String resUrl = m_Pipe.getResourceUrl();
 		String resId = m_Pipe.getResourceId();
-		if (!StringUtil.isEmpty(resId)) {
-			String resService = m_Pipe.getResourceService();
+		if (StringUtil.isEmpty(resUrl) && !StringUtil.isEmpty(resId)) {
 			long resExpire = m_Pipe.getResourceExpire();
 			StreamResourceToken token = new StreamResourceToken();
-			token.setServiceName(resService);
+			token.setServiceName(m_Pipe.getResourceService());
+			token.setServiceNo(m_Pipe.getResourceServiceNo());
 			token.setResourceId(resId);
 			token.setExpire(resExpire);
-			String resUrl = m_Supporter.genResourceUrl(token);
-			if (!StringUtil.isEmpty(resUrl)) {
-				wfResp.setResourceUrl(resUrl);
-			}
+			resUrl = m_Supporter.genResourceUrl(token);
+		}
+		if (!StringUtil.isEmpty(resUrl)) {
+			wfResp.setResourceUrl(resUrl);
 		}
 		List<String> eventReceives = m_Pipe.getNotifyReceives();
 		if (!ListUtil.isEmpty(eventReceives)) {
