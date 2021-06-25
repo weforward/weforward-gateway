@@ -714,7 +714,7 @@ public class DistributeManageImpl
 
 	@Override
 	public ResultPage<DistributedService> getServices() {
-		return toDistributedService(m_Gateway.listService(null));
+		return toDistributedService(m_Gateway.listService(null, null));
 	}
 
 	@Override

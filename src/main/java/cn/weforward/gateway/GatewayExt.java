@@ -106,9 +106,10 @@ public interface GatewayExt extends Gateway {
 	 * 
 	 * @param keyword
 	 *            名称关键字，支持通配符'*'，如：*_order,*.pay,us*er
+	 * @param accessGroup 微服务所属的access group
 	 * @return 微服务概要信息
 	 */
-	ResultPage<ServiceSummary> listServiceSummary(String keyword);
+	ResultPage<ServiceSummary> listServiceSummary(String keyword, String accessGroup);
 	
 	/**
 	 * 列举有效的微服务实例
@@ -118,4 +119,13 @@ public interface GatewayExt extends Gateway {
 	 * @return
 	 */
 	List<ServiceInstance> listValidService(String name);
+	
+	/**
+	 * 是否存在此名称的微服务
+	 * 
+	 * @param name 微服务名
+	 * @param accessGroup 若指定access group，则微服务必须归属于其中
+	 * @return
+	 */
+	boolean isExistService(String name, String accessGroup);
 }

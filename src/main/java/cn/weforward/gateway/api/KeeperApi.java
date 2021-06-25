@@ -90,6 +90,7 @@ class KeeperApi extends AbstractGatewayApi {
 		register(listServiceName);
 		register(listServiceSummary);
 		register(searchService);
+		register(isExistService);
 
 		register(getRightTable);
 		register(appendRightRule);
@@ -229,17 +230,10 @@ class KeeperApi extends AbstractGatewayApi {
 					keyword = keyword + '*';
 				}
 			}
-			String prefix = params.getString("prefix");
-			if (!StringUtil.isEmpty(prefix)) {
-				if (StringUtil.isEmpty(keyword)) {
-					keyword = prefix + '*';
-				} else {
-					keyword = prefix + keyword;
-				}
-			}
+			String accessGroup = params.getString("access_group");
 			int page = params.getInt("page", 1);
 			int pageSize = params.getInt("page_size", 50);
-			ResultPage<String> names = m_Gateway.listServiceName(keyword);
+			ResultPage<String> names = m_Gateway.listServiceName(keyword, accessGroup);
 			if (names.getCount() > 0) {
 				names.setPageSize(pageSize);
 				names.gotoPage(page);
@@ -261,9 +255,10 @@ class KeeperApi extends AbstractGatewayApi {
 					keyword = keyword + '*';
 				}
 			}
+			String accessGroup = params.getString("access_group");
 			int page = params.getInt("page", 1);
 			int pageSize = params.getInt("page_size", 50);
-			ResultPage<ServiceSummary> summarys = m_Gateway.listServiceSummary(keyword);
+			ResultPage<ServiceSummary> summarys = m_Gateway.listServiceSummary(keyword, accessGroup);
 			if (summarys.getCount() > 0) {
 				summarys.setPageSize(pageSize);
 				summarys.gotoPage(page);
@@ -279,8 +274,9 @@ class KeeperApi extends AbstractGatewayApi {
 			String name = params.getString("name");
 			int page = params.getInt("page", 1);
 			int pageSize = params.getInt("page_size", 50);
+			String accessGroup = params.getString("access_group");
 			ResultPage<ServiceExtVo> vos = ResultPageHelper.empty();
-			ResultPage<ServiceInstance> rp = m_Gateway.listService(name);
+			ResultPage<ServiceInstance> rp = m_Gateway.listService(name, accessGroup);
 			if (rp.getCount() > 0) {
 				vos = new TransResultPage<ServiceExtVo, ServiceInstance>(rp) {
 
@@ -558,15 +554,23 @@ class KeeperApi extends AbstractGatewayApi {
 			String serviceNo = params.getString("service_no");
 			String source = params.getString("script-source");
 			String name = params.getString("script-name");
-			;
 			String args = params.getString("script-args");
-			;
 			try {
 				return m_Gateway.debugService(serviceName, serviceNo, source, name, args);
 			} catch (DebugServiceException e) {
 				_Logger.warn(e.toString(), e);
 				throw new ApiException(CommonServiceCodes.INTERNAL_ERROR.code, e.getMessage());
 			}
+		}
+	};
+	
+	private ApiMethod isExistService = new ApiMethod("is_exist_service") {
+
+		@Override
+		Boolean execute(Header header, FriendlyObject params) throws ApiException {
+			String name = params.getString("name");
+			String accessGroup = params.getString("access_group");
+			return m_Gateway.isExistService(name, accessGroup);
 		}
 	};
 

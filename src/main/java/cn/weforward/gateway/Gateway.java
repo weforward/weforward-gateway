@@ -65,9 +65,10 @@ public interface Gateway {
 	 * 列举微服务名称
 	 * 
 	 * @param keyword 名称关键字，支持通配符'*'，如：*_order,*.pay,us*er
+	 * @param accessGroup 微服务所属的access group
 	 * @return
 	 */
-	ResultPage<String> listServiceName(String keyword);
+	ResultPage<String> listServiceName(String keyword, String accessGroup);
 
 	/**
 	 * 列举微服务（实例）。
@@ -75,9 +76,10 @@ public interface Gateway {
 	 * 支持按名称模糊搜索
 	 * 
 	 * @param name 服务名称，可空
+	 * @param accessGroup 微服务所属的access group
 	 * @return
 	 */
-	ResultPage<ServiceInstance> listService(String name);
+	ResultPage<ServiceInstance> listService(String name, String accessGroup);
 
 	/**
 	 * 查询微服务（实例）

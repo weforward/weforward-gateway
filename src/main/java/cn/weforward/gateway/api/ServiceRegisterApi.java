@@ -133,7 +133,7 @@ class ServiceRegisterApi extends AbstractGatewayApi implements PluginListener {
 			String keyword = params.getString("keyword");
 			int page = params.getInt("page", 1);
 			int pageSize = params.getInt("page_size", 50);
-			ResultPage<String> names = m_Gateway.listServiceName(keyword);
+			ResultPage<String> names = m_Gateway.listServiceName(keyword, null);
 			if (names.getCount() > 0) {
 				names.setPageSize(pageSize);
 				names.gotoPage(page);

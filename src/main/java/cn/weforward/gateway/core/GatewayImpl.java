@@ -60,6 +60,7 @@ import cn.weforward.protocol.exception.WeforwardException;
 import cn.weforward.protocol.ext.Producer;
 import cn.weforward.protocol.ext.ServiceRuntime;
 import cn.weforward.protocol.gateway.ServiceSummary;
+import cn.weforward.protocol.ops.AccessExt;
 import cn.weforward.protocol.ops.trace.ServiceTraceToken;
 import cn.weforward.protocol.ops.traffic.TrafficTable;
 import io.micrometer.core.instrument.Gauge;
@@ -500,7 +501,7 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 	}
 
 	@Override
-	public ResultPage<String> listServiceName(String keyword) {
+	public ResultPage<String> listServiceName(String keyword, String accessGroup) {
 		if (m_ServiceBalances.isEmpty()) {
 			return ResultPageHelper.empty();
 		}
@@ -524,6 +525,16 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 				result.add(n);
 			}
 		}
+		if (!StringUtil.isEmpty(accessGroup) && result.size() > 0) {
+			// 按所属access group过滤
+			List<String> filterByGroup = new ArrayList<>(result.size());
+			for(String name : result) {
+				if(isExistService(name, accessGroup)) {
+					filterByGroup.add(name);
+				}
+			}
+			result = filterByGroup;
+		}
 		if (result.size() > 1) {
 			Collections.sort(result);
 		}
@@ -531,21 +542,47 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 	}
 
 	@Override
-	public ResultPage<ServiceInstance> listService(String name) {
-		List<ServiceInstance> list = new ArrayList<>();
+	public ResultPage<ServiceInstance> listService(String name, String accessGroup) {
+		List<ServiceInstance> list = listService0(name, accessGroup, Integer.MAX_VALUE);
+		if (list.size() > 1) {
+			Collections.sort(list, Service.CMP_BY_NAME);
+		}
+		return ResultPageHelper.toResultPage(list);
+	}
+	
+	private List<ServiceInstance> listService0(String name, String accessGroup, int maxSize) {
+		if (maxSize <= 0) {
+			maxSize = Integer.MAX_VALUE;
+		}
+		List<ServiceInstance> list = null;
 		if (StringUtil.isEmpty(name)) {
 			name = null;
+		}
+		if (StringUtil.isEmpty(accessGroup)) {
+			accessGroup = null;
 		}
 		for (ServiceInstance s : m_Services.values()) {
 			if (null != name && !s.getName().equals(name)) {
 				continue;
 			}
+			if (null != accessGroup) {
+				AccessExt access = m_AccessManage.getAccess(s.getOwner());
+				if (null == access || !accessGroup.equals(access.getGroupId())) {
+					continue;
+				}
+			}
+			if (1 == maxSize) {
+				return Collections.singletonList(s);
+			}
+			if (null == list) {
+				list = new ArrayList<>();
+			}
 			list.add(s);
+			if (list.size() >= maxSize) {
+				break;
+			}
 		}
-		if (list.size() > 1) {
-			Collections.sort(list, Service.CMP_BY_NAME);
-		}
-		return ResultPageHelper.toResultPage(list);
+		return list;
 	}
 	
 	@Override
@@ -679,8 +716,8 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 	}
 
 	@Override
-	public ResultPage<ServiceSummary> listServiceSummary(String keyword) {
-		ResultPage<String> names = listServiceName(keyword);
+	public ResultPage<ServiceSummary> listServiceSummary(String keyword, String accessGroup) {
+		ResultPage<String> names = listServiceName(keyword, accessGroup);
 		List<ServiceSummary> summarys = new ArrayList<ServiceSummary>(names.getCount());
 		for (String name : ResultPageHelper.toForeach(names)) {
 			ServiceInstanceBalance balance = m_ServiceBalances.get(name);
@@ -699,5 +736,10 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 	
 	protected ServiceInstanceBalance getServiceInstanceBalance(String name) {
 		return m_ServiceBalances.get(name);
+	}
+	
+	@Override
+	public boolean isExistService(String name, String accessGroup) {
+		return listService0(name, accessGroup, 1).size() > 0;
 	}
 }
