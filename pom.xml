@@ -118,26 +118,5 @@
 				<activeByDefault>true</activeByDefault>
 			</activation>
 		</profile>
-		<profile>
-			<id>light</id>
-			<build>
-				<finalName>weforward-gateway-light</finalName>
-				<plugins>
-					<plugin>
-						<groupId>cn.weforward</groupId>
-						<artifactId>build-maven-plugin</artifactId>
-						<version>1.1.0</version>
-						<configuration>
-							<mainVersion>1.2</mainVersion>
-							<outputDirectory>bin</outputDirectory>
-							<excludes>
-								<exclude>*.xml</exclude>
-								<exclude>*.properties</exclude>
-							</excludes>
-						</configuration>
-					</plugin>
-				</plugins>
-			</build>
-		</profile>
 	</profiles>
 </project>
