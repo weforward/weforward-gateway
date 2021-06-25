@@ -19,6 +19,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.RejectedExecutionException;
 
+import cn.weforward.common.execption.BusyException;
 import cn.weforward.common.execption.InvalidFormatException;
 import cn.weforward.common.io.BytesOutputStream;
 import cn.weforward.common.json.JsonInput;
@@ -289,7 +290,7 @@ public class ServiceEndpointImpl extends ServiceEndpoint {
 			try {
 				m_Context = channel.request(this, m_Url.url, HttpConstants.METHOD_POST);
 				m_Context.setTimeout(timeout * 1000);
-			} catch (IOException e) {
+			} catch (IOException | BusyException e) {
 				m_Url.fail();
 				responseError(e);
 			}
@@ -762,6 +763,10 @@ public class ServiceEndpointImpl extends ServiceEndpoint {
 			} else if (e instanceof InvalidFormatException) {
 				code = WeforwardException.CODE_SERIAL_ERROR;
 				msg = "响应内容格式有误";
+			} else if (e instanceof BusyException) {
+				code = WeforwardException.CODE_SERVICE_BUSY;
+				msg = "微服务忙：" + e.getMessage();
+				state = BalanceElement.STATE_BUSY;
 			} else if (e instanceof WeforwardException) {
 				code = ((WeforwardException) e).getCode();
 				msg = "内部错误：" + e.getMessage();
@@ -871,15 +876,19 @@ public class ServiceEndpointImpl extends ServiceEndpoint {
 				return;
 			}
 			if (HttpConstants.OK != code) {
+				int wfCode = WeforwardException.CODE_SERVICE_INVOKE_ERROR;
 				int state = BalanceElement.STATE_FAIL;
 				if (HttpConstants.ACCEPTED == code) {
 					state = BalanceElement.STATE_TIMEOUT;
+					wfCode = WeforwardException.CODE_SERVICE_TIMEOUT;
 				} else if (HttpConstants.TOO_MANY_REQUESTS == code) {
 					state = BalanceElement.STATE_BUSY;
+					wfCode = WeforwardException.CODE_SERVICE_BUSY;
 				} else if (HttpConstants.SERVICE_UNAVAILABLE == code) {
 					state = BalanceElement.STATE_UNAVAILABLE;
+					wfCode = WeforwardException.CODE_SERVICE_UNAVAILABLE;
 				}
-				responseError(WeforwardException.CODE_SERVICE_INVOKE_ERROR, "http状态码异常:" + code, state);
+				responseError(wfCode, "http状态码异常:" + code, state);
 				return;
 			}
 

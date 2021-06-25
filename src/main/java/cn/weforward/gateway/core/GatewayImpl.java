@@ -372,7 +372,7 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 			if (exist.getHeartbeatMills() >= service.getHeartbeatMills()) {
 				return;
 			}
-			if (foreign && null != exist.getClientChannel() && !exist.isTimeout()) {
+			if (foreign && !exist.isTimeout() && null != exist.getClientChannel() && exist.getClientChannel().isValid()) {
 				// 原实例与本网关有建立专用信道，故保留原实例
 				return;
 			}
