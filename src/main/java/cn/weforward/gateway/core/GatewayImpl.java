@@ -582,7 +582,7 @@ public class GatewayImpl implements GatewayExt, TrafficListener, PluginListener,
 				break;
 			}
 		}
-		return list;
+		return null == list ? Collections.emptyList() : list;
 	}
 	
 	@Override
