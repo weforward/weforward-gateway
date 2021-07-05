@@ -648,7 +648,7 @@ public class ServiceEndpointImpl extends ServiceEndpoint {
 				} else {
 					msg = "运行异常:" + wfResp.code + "/" + wfResp.msg;
 				}
-				responseError(code, msg, state);
+				responseError(code, msg, state, false);
 				return;
 			}
 
@@ -739,7 +739,7 @@ public class ServiceEndpointImpl extends ServiceEndpoint {
 				}
 			}
 
-			responseError(WeforwardException.CODE_SERVICE_TIMEOUT, "响应超时", BalanceElement.STATE_TIMEOUT);
+			responseError(WeforwardException.CODE_SERVICE_TIMEOUT, "响应超时", BalanceElement.STATE_TIMEOUT, true);
 		}
 
 		void responseError(Throwable e) {
@@ -774,14 +774,14 @@ public class ServiceEndpointImpl extends ServiceEndpoint {
 				code = WeforwardException.CODE_UNDEFINED;
 				msg = "内部错误";
 			}
-			responseError(code, msg, state);
+			responseError(code, msg, state, true);
 		}
 
 		void responseError(int code, String msg) {
-			responseError(code, msg, BalanceElement.STATE_EXCEPTION);
+			responseError(code, msg, BalanceElement.STATE_EXCEPTION, true);
 		}
-
-		void responseError(int code, String msg, int state) {
+		
+		void responseError(int code, String msg, int state, boolean disconnect) {
 			StringBuilder sb = StringBuilderPool._8k.poll();
 			try {
 				sb.append("微服务[").append(getService().toStringNameNo()).append("]");
@@ -792,7 +792,7 @@ public class ServiceEndpointImpl extends ServiceEndpoint {
 			} finally {
 				end(state);
 				StringBuilderPool._8k.offer(sb);
-				if (null != m_Context) {
+				if (null != m_Context && disconnect) {
 					m_Context.disconnect();
 				}
 			}
@@ -818,7 +818,7 @@ public class ServiceEndpointImpl extends ServiceEndpoint {
 			m_Url.fail();
 			_Logger.warn("连接失败：" + m_Url.url);
 
-			responseError(WeforwardException.CODE_SERVICE_CONNECT_FAIL, "连接失败", BalanceElement.STATE_FAIL);
+			responseError(WeforwardException.CODE_SERVICE_CONNECT_FAIL, "连接失败", BalanceElement.STATE_FAIL, true);
 		}
 
 		@Override
@@ -838,7 +838,7 @@ public class ServiceEndpointImpl extends ServiceEndpoint {
 			try {
 				ServiceEndpointImpl.this.getRpcExecutor().execute(this);
 			} catch (RejectedExecutionException e) {
-				responseError(WeforwardException.CODE_GATEWAY_BUSY, "网关忙", BalanceElement.STATE_OK);
+				responseError(WeforwardException.CODE_GATEWAY_BUSY, "网关忙", BalanceElement.STATE_OK, false);
 			}
 		}
 
@@ -858,7 +858,7 @@ public class ServiceEndpointImpl extends ServiceEndpoint {
 			}
 
 			// responseError(REQUEST_ABORT);
-			responseError(WeforwardException.CODE_SERVICE_INVOKE_ERROR, "调用中止", BalanceElement.STATE_FAIL);
+			responseError(WeforwardException.CODE_SERVICE_INVOKE_ERROR, "调用中止", BalanceElement.STATE_FAIL, true);
 		}
 
 		@Override
@@ -888,7 +888,7 @@ public class ServiceEndpointImpl extends ServiceEndpoint {
 					state = BalanceElement.STATE_UNAVAILABLE;
 					wfCode = WeforwardException.CODE_SERVICE_UNAVAILABLE;
 				}
-				responseError(wfCode, "http状态码异常:" + code, state);
+				responseError(wfCode, "http状态码异常:" + code, state, true);
 				return;
 			}
 
